@@ -12,7 +12,7 @@ import type { Project } from "./types";
 const MOCK = process.env.MOCK_CLOUD === "1"; // local testing only: stores files in a temp folder
 
 export function cloudEnabled(): boolean {
-  return MOCK || Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return MOCK || Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 }
 
 export function isValidId(id: string): boolean {
