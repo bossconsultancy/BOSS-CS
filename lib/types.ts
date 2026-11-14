@@ -67,6 +67,8 @@ export interface Palette {
 }
 
 export type LayoutMode = "auto" | "wide" | "split";
+export type FontKey = "title" | "code" | "tagline" | "facts" | "headings" | "list" | "chips" | "callout" | "footer";
+export const FONT_KEYS: FontKey[] = ["title", "code", "tagline", "facts", "headings", "list", "chips", "callout", "footer"];
 export type SectionKey = "intro" | "tagline" | "learn" | "highlights" | "careers" | "admission" | "salary" | "financial";
 
 export interface PhotoSettings {
@@ -85,6 +87,8 @@ export interface Design {
   headerHeight: number; // px, 300-420
   photo: PhotoSettings;
   hidden: Partial<Record<SectionKey, boolean>>;
+  /** Size multipliers per text group (1 = normal). Missing = 1. */
+  fontScales?: Partial<Record<FontKey, number>>;
 }
 
 export interface Brand {
@@ -98,6 +102,8 @@ export interface Project {
   id: string;
   name: string;
   updatedAt: number;
+  createdBy?: string;
+  updatedBy?: string;
   content: FlyerContent;
   design: Design;
   brand: Brand;

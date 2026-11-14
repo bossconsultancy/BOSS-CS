@@ -24,6 +24,12 @@ export const ICONS: Record<IconName, LucideIcon> = {
 /** body sizes scale with --k (auto-fit); header sizes with --h */
 const k = (n: number) => `calc(var(--k, 1) * ${n}px)`;
 const hs = (n: number) => `calc(var(--h, 1) * ${n}px)`;
+/** body text that also follows a per-group size setting */
+const kv = (group: string, n: number) => `calc(var(--k, 1) * var(--s-${group}, 1) * ${n}px)`;
+/** header text: auto-shrink (--h) times the group setting */
+const hv = (group: string, n: number) => `calc(var(--h, 1) * var(--s-${group}, 1) * ${n}px)`;
+/** fixed-size text that follows a group setting */
+const fv = (group: string, n: number) => `calc(var(--s-${group}, 1) * ${n}px)`;
 
 function Tile({ Icon, t, size = 28, glyph = 15, radius = 7 }: { Icon: LucideIcon; t: Theme; size?: number; glyph?: number; radius?: number }) {
   return (
@@ -38,7 +44,7 @@ function Head({ Icon, title, t }: { Icon: LucideIcon; title: string; t: Theme })
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <Tile Icon={Icon} t={t} />
-        <h2 style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: k(17), lineHeight: 1.2, color: t.ink }}>{title}</h2>
+        <h2 style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("headings", 17), lineHeight: 1.2, color: t.ink }}>{title}</h2>
       </div>
       <div style={{ height: 2, background: t.tile, borderRadius: 1 }} />
     </div>
@@ -49,7 +55,7 @@ function PanelHead({ Icon, title, t }: { Icon: LucideIcon; title: string; t: The
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <Tile Icon={Icon} t={t} />
-      <h2 style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: k(17), lineHeight: 1.2, color: t.ink }}>{title}</h2>
+      <h2 style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("headings", 17), lineHeight: 1.2, color: t.ink }}>{title}</h2>
     </div>
   );
 }
@@ -62,7 +68,7 @@ function Checklist({ items, t, cols = 1, fs = 13 }: { items: string[]; t: Theme;
           <div style={{ width: 16, height: 16, borderRadius: 8, background: t.tile, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: k(1.5) }}>
             <Check size={11} color="#FFFFFF" strokeWidth={3} aria-hidden />
           </div>
-          <span style={{ fontFamily: DM, fontSize: k(fs), lineHeight: 1.42, color: t.body }}>{it}</span>
+          <span style={{ fontFamily: DM, fontSize: kv("list", fs), lineHeight: 1.42, color: t.body }}>{it}</span>
         </div>
       ))}
     </div>
@@ -75,7 +81,7 @@ function Chips({ items, t, cols = 2 }: { items: string[]; t: Theme; cols?: numbe
       {items.map((it, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, background: t.light, border: `1px solid ${t.rule}`, borderRadius: 7, padding: `${k(6)} 9px` }}>
           <div style={{ width: 6, height: 6, borderRadius: 3, background: t.tile, flexShrink: 0 }} />
-          <span style={{ fontFamily: DM, fontWeight: 500, fontSize: k(12.5), lineHeight: 1.3, color: t.ink }}>{it}</span>
+          <span style={{ fontFamily: DM, fontWeight: 500, fontSize: kv("chips", 12.5), lineHeight: 1.3, color: t.ink }}>{it}</span>
         </div>
       ))}
     </div>
@@ -94,7 +100,7 @@ function Callout({ text, t }: { text: string; t: Theme }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, background: t.light, border: `1px solid ${t.rule}`, borderRadius: 12, padding: `${k(12)} 16px` }}>
       <Tile Icon={HandCoins} t={t} size={36} glyph={19} radius={10} />
-      <p style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: k(14.5), lineHeight: 1.35, color: t.ink }}>{text}</p>
+      <p style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("callout", 14.5), lineHeight: 1.35, color: t.ink }}>{text}</p>
     </div>
   );
 }
@@ -105,18 +111,18 @@ function FactCell({ f, t, first }: { f: Fact; t: Theme; first: boolean }) {
     <div style={{ borderLeft: first ? "none" : `1px solid ${t.rule}`, padding: "12px 12px", display: "flex", gap: 10, alignItems: "flex-start", minWidth: 0 }}>
       <Tile Icon={Icon} t={t} size={30} glyph={16} radius={8} />
       <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-        <span style={{ fontFamily: DM, fontWeight: 600, fontSize: 12, letterSpacing: "0.05em", textTransform: "uppercase", color: t.muted }}>{f.label}</span>
-        <span style={{ fontFamily: PO, fontWeight: 600, fontSize: 16.5, lineHeight: 1.2, color: t.ink }}>{f.value}</span>
-        {f.note ? <span style={{ fontFamily: DM, fontSize: 12, lineHeight: 1.3, color: t.muted }}>{f.note}</span> : null}
+        <span style={{ fontFamily: DM, fontWeight: 600, fontSize: fv("facts", 12), letterSpacing: "0.05em", textTransform: "uppercase", color: t.muted }}>{f.label}</span>
+        <span style={{ fontFamily: PO, fontWeight: 600, fontSize: fv("facts", 16.5), lineHeight: 1.2, color: t.ink }}>{f.value}</span>
+        {f.note ? <span style={{ fontFamily: DM, fontSize: fv("facts", 12), lineHeight: 1.3, color: t.muted }}>{f.note}</span> : null}
       </div>
     </div>
   );
 }
 
 /** Column size for a fact cell: the value and label never wrap (min width); long notes may wrap. */
-function factColumn(f: Fact): string {
-  const base = Math.max(f.value.length * 11, f.label.length * 8.8, 60) + 66;
-  const full = Math.max(base, Math.min(240, f.note.length * 6.4) + 66);
+function factColumn(f: Fact, scale = 1): string {
+  const base = Math.max(f.value.length * 11, f.label.length * 8.8, 60) * scale + 66;
+  const full = Math.max(base, Math.min(240, f.note.length * 6.4) * scale + 66);
   return `minmax(${Math.round(base)}px, ${Math.round(full)}fr)`;
 }
 
@@ -199,8 +205,8 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
       <PanelHead Icon={TrendingUp} title={titles.salary} t={t} />
       {salary.map((r, i) => (
         <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2, borderTop: i ? `1px solid ${t.rule}` : "none", paddingTop: i ? k(8) : 0 }}>
-          <span style={{ fontFamily: DM, fontWeight: 600, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", color: t.muted }}>{r.label}</span>
-          <span style={{ fontFamily: PO, fontWeight: 600, fontSize: k(19), lineHeight: 1.2, color: t.ink }}>{r.value}</span>
+          <span style={{ fontFamily: DM, fontWeight: 600, fontSize: fv("callout", 12), letterSpacing: "0.06em", textTransform: "uppercase", color: t.muted }}>{r.label}</span>
+          <span style={{ fontFamily: PO, fontWeight: 600, fontSize: kv("callout", 19), lineHeight: 1.2, color: t.ink }}>{r.value}</span>
         </div>
       ))}
     </Panel>
@@ -254,7 +260,7 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
   const companyTag = (brand.companyTagline || "").split("\n");
 
   const hero = design.headerHeight || 350;
-  const fitKey = JSON.stringify([c, design.hidden, design.layout, design.learnCols, design.textSize, hero, brand]);
+  const fitKey = JSON.stringify([c, design.hidden, design.layout, design.learnCols, design.textSize, hero, brand, design.fontScales]);
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -299,11 +305,14 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
 
   const photo = design.photo;
   const footerItems: { Icon: LucideIcon; node: ReactNode }[] = [];
-  if (brand.phone) footerItems.push({ Icon: Phone, node: <span style={{ fontFamily: PO, fontWeight: 600, fontSize: 16, color: t.footerText, letterSpacing: "0.01em" }}>{brand.phone}</span> });
-  if (brand.address) footerItems.push({ Icon: MapPin, node: <span style={{ fontFamily: DM, fontWeight: 500, fontSize: 12.5, lineHeight: 1.3, color: t.footerText }}>{brand.address}</span> });
-  if (brand.website) footerItems.push({ Icon: Globe, node: <span style={{ fontFamily: PO, fontWeight: 600, fontSize: 14, color: t.footerText, letterSpacing: "0.03em" }}>{brand.website}</span> });
+  if (brand.phone) footerItems.push({ Icon: Phone, node: <span style={{ fontFamily: PO, fontWeight: 600, fontSize: fv("footer", 16), color: t.footerText, letterSpacing: "0.01em" }}>{brand.phone}</span> });
+  if (brand.address) footerItems.push({ Icon: MapPin, node: <span style={{ fontFamily: DM, fontWeight: 500, fontSize: fv("footer", 12.5), lineHeight: 1.3, color: t.footerText }}>{brand.address}</span> });
+  if (brand.website) footerItems.push({ Icon: Globe, node: <span style={{ fontFamily: PO, fontWeight: 600, fontSize: fv("footer", 14), color: t.footerText, letterSpacing: "0.03em" }}>{brand.website}</span> });
 
+  const scaleVars: Record<string, number> = {};
+  for (const [key, val] of Object.entries(design.fontScales || {})) if (typeof val === "number" && val > 0) scaleVars[`--s-${key}`] = val;
   const rootStyle: CSSProperties = {
+    ...(scaleVars as CSSProperties),
     width: FLYER_W, height: FLYER_H, position: "relative", overflow: "hidden", background: "#FFFFFF",
     display: "flex", flexDirection: "column", fontFamily: DM, color: t.body,
   };
@@ -318,30 +327,30 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
             {companyTag.some(Boolean) ? (
               <>
                 <div style={{ width: 1, height: 36, background: t.bandText, opacity: 0.45 }} />
-                <p style={{ margin: 0, fontFamily: PO, fontWeight: 500, fontStyle: "italic", fontSize: 12.5, lineHeight: 1.35, color: t.bandText, whiteSpace: "pre-line" }}>{companyTag.join("\n")}</p>
+                <p style={{ margin: 0, fontFamily: PO, fontWeight: 500, fontStyle: "italic", fontSize: fv("tagline", 12.5), lineHeight: 1.35, color: t.bandText, whiteSpace: "pre-line" }}>{companyTag.join("\n")}</p>
               </>
             ) : null}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: hs(8) }}>
             {c.eyebrow ? (
-              <span style={{ fontFamily: PO, fontWeight: 600, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: t.eyebrow }}>{cleanText(c.eyebrow)}</span>
+              <span style={{ fontFamily: PO, fontWeight: 600, fontSize: hv("tagline", 12), letterSpacing: "0.16em", textTransform: "uppercase", color: t.eyebrow }}>{cleanText(c.eyebrow)}</span>
             ) : null}
             <h1 style={{ margin: 0, display: "flex", flexDirection: "column", color: t.bandText }}>
               {titleLines.map((line, i) => (
-                <span key={i} style={{ fontFamily: PO, fontWeight: c.bigCode ? 600 : 700, fontSize: hs(titleSize), lineHeight: 1.1 }}>{line}</span>
+                <span key={i} style={{ fontFamily: PO, fontWeight: c.bigCode ? 600 : 700, fontSize: hv("title", titleSize), lineHeight: 1.1 }}>{line}</span>
               ))}
               {c.bigCode ? (
-                <span style={{ fontFamily: PO, fontWeight: 700, fontSize: hs(80), lineHeight: 0.9, letterSpacing: "-0.02em", color: t.big }}>{cleanText(c.bigCode)}</span>
+                <span style={{ fontFamily: PO, fontWeight: 700, fontSize: hv("code", 80), lineHeight: 0.9, letterSpacing: "-0.02em", color: t.big }}>{cleanText(c.bigCode)}</span>
               ) : null}
             </h1>
             {c.pill ? (
-              <span style={{ alignSelf: "flex-start", background: t.pillBg, color: t.pillText, fontFamily: PO, fontWeight: 600, fontSize: hs(14), lineHeight: 1, padding: "8px 14px", borderRadius: 999 }}>{cleanText(c.pill)}</span>
+              <span style={{ alignSelf: "flex-start", background: t.pillBg, color: t.pillText, fontFamily: PO, fontWeight: 600, fontSize: hv("tagline", 14), lineHeight: 1, padding: "8px 14px", borderRadius: 999 }}>{cleanText(c.pill)}</span>
             ) : null}
             {c.tagline && !hide.tagline ? (
-              <p style={{ margin: "4px 0 0", fontFamily: PO, fontWeight: 600, fontStyle: "italic", fontSize: hs(16.5), lineHeight: 1.3, color: t.tagline }}>{cleanText(c.tagline)}</p>
+              <p style={{ margin: "4px 0 0", fontFamily: PO, fontWeight: 600, fontStyle: "italic", fontSize: hv("tagline", 16.5), lineHeight: 1.3, color: t.tagline }}>{cleanText(c.tagline)}</p>
             ) : null}
             {c.intro && !hide.intro ? (
-              <p style={{ margin: 0, fontFamily: DM, fontSize: hs(13.5), lineHeight: 1.5, color: t.bandMuted }}>{cleanText(c.intro)}</p>
+              <p style={{ margin: 0, fontFamily: DM, fontSize: hv("tagline", 13.5), lineHeight: 1.5, color: t.bandMuted }}>{cleanText(c.intro)}</p>
             ) : null}
           </div>
         </div>
@@ -364,7 +373,7 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
       </header>
 
       {facts.length ? (
-        <div style={{ margin: `-34px ${MX}px 0`, background: "#FFFFFF", border: `1px solid ${t.rule}`, borderRadius: 12, boxShadow: "0 6px 18px rgba(20, 30, 40, 0.08)", display: "grid", gridTemplateColumns: facts.map(factColumn).join(" "), position: "relative" }}>
+        <div style={{ margin: `-34px ${MX}px 0`, background: "#FFFFFF", border: `1px solid ${t.rule}`, borderRadius: 12, boxShadow: "0 6px 18px rgba(20, 30, 40, 0.08)", display: "grid", gridTemplateColumns: facts.map((f) => factColumn(f, design.fontScales?.facts ?? 1)).join(" "), position: "relative" }}>
           {facts.map((f, i) => (
             <FactCell key={i} f={{ ...f, label: cleanText(f.label), value: cleanText(f.value), note: cleanText(f.note) }} t={t} first={i === 0} />
           ))}

@@ -8,7 +8,7 @@ import { PRESETS, paletteFromBase } from "@/lib/colors";
 import { buildImagePrompt } from "@/lib/prompt";
 import { readImageFile } from "@/lib/exporters";
 import { hasLongDash } from "@/lib/text";
-import { ICON_NAMES, type Brand, type Design, type Fact, type FlyerContent, type IconName, type SectionKey } from "@/lib/types";
+import { ICON_NAMES, type Brand, type Design, type Fact, type FlyerContent, type FontKey, type IconName, type SectionKey } from "@/lib/types";
 
 /* ---------------- Content ---------------- */
 
@@ -288,14 +288,10 @@ export function DesignPanel({ design, set, fitK }: { design: Design; set: (d: De
             <option value={3}>3 columns</option>
           </select>
         </Field>
-        <Toggle label="Automatic text size (fills the page)" checked={!design.textSize} onChange={(v) => set({ ...design, textSize: v ? 0 : Number(fitK.toFixed(2)) || 1 })} />
-        {design.textSize ? (
-          <Range label="Text size" value={design.textSize} min={0.9} max={1.25} step={0.01} onChange={(v) => set({ ...design, textSize: v })} format={(v) => `${Math.round(v * 100)}%`} />
-        ) : (
-          <p className="note">Current size: {Math.round(fitK * 100)}%</p>
-        )}
         <Range label="Header height" value={design.headerHeight} min={300} max={420} step={5} onChange={(v) => set({ ...design, headerHeight: v })} format={(v) => `${v}px`} />
       </Section>
+
+      <TextSizes design={design} set={set} fitK={fitK} />
 
       <Section title="Show or hide sections">
         <div className="toggles">
@@ -321,6 +317,56 @@ export function BrandPanel({ brand, set, onSaveDefault }: { brand: Brand; set: (
       <Field label="Address"><Text value={brand.address} onChange={(v) => u("address", v)} /></Field>
       <Field label="Website"><Text value={brand.website} onChange={(v) => u("website", v)} /></Field>
       <button type="button" className="btn small" onClick={onSaveDefault}>Use these for every new flyer</button>
+    </Section>
+  );
+}
+
+
+/* ---------------- Text sizes ---------------- */
+
+const FONT_CONTROLS: { key: FontKey; label: string; min: number; max: number }[] = [
+  { key: "title", label: "Headline", min: 0.7, max: 1.4 },
+  { key: "code", label: "Big code (G2, G3)", min: 0.6, max: 1.3 },
+  { key: "tagline", label: "Tagline, intro and badge", min: 0.8, max: 1.3 },
+  { key: "facts", label: "Key facts boxes", min: 0.85, max: 1.2 },
+  { key: "headings", label: "Section titles", min: 0.8, max: 1.3 },
+  { key: "list", label: "Topics, highlights and requirements", min: 0.85, max: 1.3 },
+  { key: "chips", label: "Career boxes", min: 0.85, max: 1.3 },
+  { key: "callout", label: "Salary and financial note", min: 0.8, max: 1.3 },
+  { key: "footer", label: "Footer contact details", min: 0.85, max: 1.2 },
+];
+
+function TextSizes({ design, set, fitK }: { design: Design; set: (d: Design) => void; fitK: number }) {
+  const fs = design.fontScales || {};
+  const val = (key: FontKey) => fs[key] ?? 1;
+  const setScale = (key: FontKey, v: number) => set({ ...design, fontScales: { ...fs, [key]: Math.round(v * 100) / 100 } });
+  const kk = design.textSize || fitK || 1;
+  const smallest = Math.min(12.5 * kk * val("list"), 12.5 * kk * val("chips"), 12 * val("facts"), 12.5 * val("footer"), 12 * val("callout"));
+  const changed = Object.values(fs).some((v) => v !== undefined && v !== 1) || design.textSize !== 0;
+
+  return (
+    <Section title="Text sizes">
+      <Toggle label="Automatic body text size (fills the page)" checked={!design.textSize} onChange={(v) => set({ ...design, textSize: v ? 0 : Number(fitK.toFixed(2)) || 1 })} />
+      {design.textSize ? (
+        <Range label="Overall body text" value={design.textSize} min={0.9} max={1.25} step={0.01} onChange={(v) => set({ ...design, textSize: v })} format={(v) => `${Math.round(v * 100)}%`} />
+      ) : (
+        <p className="note">Body text is set automatically to fill the page (now {Math.round(fitK * 100)}%). The sliders below still work: bigger text in one part makes the rest adjust to fit.</p>
+      )}
+      {FONT_CONTROLS.map((f) => (
+        <div key={f.key} className="size-row">
+          <Range label={f.label} value={val(f.key)} min={f.min} max={f.max} step={0.01} onChange={(v) => setScale(f.key, v)} format={(v) => `${Math.round(v * 100)}%`} />
+          <div className="size-steps">
+            <button type="button" className="icon-btn" aria-label={`Smaller ${f.label}`} onClick={() => setScale(f.key, Math.max(f.min, val(f.key) - 0.05))}>A−</button>
+            <button type="button" className="icon-btn" aria-label={`Larger ${f.label}`} onClick={() => setScale(f.key, Math.min(f.max, val(f.key) + 0.05))}>A+</button>
+          </div>
+        </div>
+      ))}
+      {smallest < 11.9 ? <p className="note warn">Some text is now smaller than 12px ({smallest.toFixed(1)}px) and may be hard to read in print.</p> : null}
+      {changed ? (
+        <button type="button" className="btn ghost small" onClick={() => set({ ...design, fontScales: {}, textSize: 0 })}>
+          Reset all text sizes
+        </button>
+      ) : null}
     </Section>
   );
 }
