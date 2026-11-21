@@ -12,6 +12,7 @@ import type { Brand, Design, Fact, FlyerContent, IconName } from "@/lib/types";
 export const FLYER_W = 840;
 export const FLYER_H = 1080;
 const MX = 72;
+export const PAGE_GAP = 28;
 const PO = "'Poppins', sans-serif";
 const DM = "'DM Sans', sans-serif";
 
@@ -39,28 +40,28 @@ function Tile({ Icon, t, size = 28, glyph = 15, radius = 7 }: { Icon: LucideIcon
   );
 }
 
-function Head({ Icon, title, t }: { Icon: LucideIcon; title: string; t: Theme }) {
+function Head({ Icon, title, t, field }: { Icon: LucideIcon; title: string; t: Theme; field?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <Tile Icon={Icon} t={t} />
-        <h2 style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("headings", 17), lineHeight: 1.2, color: t.ink }}>{title}</h2>
+        <h2 data-field={field} data-group="headings" style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("headings", 17), lineHeight: 1.2, color: t.ink }}>{title}</h2>
       </div>
       <div style={{ height: 2, background: t.tile, borderRadius: 1 }} />
     </div>
   );
 }
 
-function PanelHead({ Icon, title, t }: { Icon: LucideIcon; title: string; t: Theme }) {
+function PanelHead({ Icon, title, t, field }: { Icon: LucideIcon; title: string; t: Theme; field?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <Tile Icon={Icon} t={t} />
-      <h2 style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("headings", 17), lineHeight: 1.2, color: t.ink }}>{title}</h2>
+      <h2 data-field={field} data-group="headings" style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("headings", 17), lineHeight: 1.2, color: t.ink }}>{title}</h2>
     </div>
   );
 }
 
-function Checklist({ items, t, cols = 1, fs = 13 }: { items: string[]; t: Theme; cols?: number; fs?: number }) {
+function Checklist({ items, t, cols = 1, fs = 13, field }: { items: string[]; t: Theme; cols?: number; fs?: number; field?: string }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, columnGap: 16, rowGap: k(6) }}>
       {items.map((it, i) => (
@@ -68,20 +69,20 @@ function Checklist({ items, t, cols = 1, fs = 13 }: { items: string[]; t: Theme;
           <div style={{ width: 16, height: 16, borderRadius: 8, background: t.tile, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: k(1.5) }}>
             <Check size={11} color="#FFFFFF" strokeWidth={3} aria-hidden />
           </div>
-          <span style={{ fontFamily: DM, fontSize: kv("list", fs), lineHeight: 1.42, color: t.body }}>{it}</span>
+          <span data-field={field} data-i={i} data-group="list" style={{ fontFamily: DM, fontSize: kv("list", fs), lineHeight: 1.42, color: t.body }}>{it}</span>
         </div>
       ))}
     </div>
   );
 }
 
-function Chips({ items, t, cols = 2 }: { items: string[]; t: Theme; cols?: number }) {
+function Chips({ items, t, cols = 2, field }: { items: string[]; t: Theme; cols?: number; field?: string }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: k(6) }}>
       {items.map((it, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, background: t.light, border: `1px solid ${t.rule}`, borderRadius: 7, padding: `${k(6)} 9px` }}>
           <div style={{ width: 6, height: 6, borderRadius: 3, background: t.tile, flexShrink: 0 }} />
-          <span style={{ fontFamily: DM, fontWeight: 500, fontSize: kv("chips", 12.5), lineHeight: 1.3, color: t.ink }}>{it}</span>
+          <span data-field={field} data-i={i} data-group="chips" style={{ fontFamily: DM, fontWeight: 500, fontSize: kv("chips", 12.5), lineHeight: 1.3, color: t.ink }}>{it}</span>
         </div>
       ))}
     </div>
@@ -100,20 +101,20 @@ function Callout({ text, t }: { text: string; t: Theme }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, background: t.light, border: `1px solid ${t.rule}`, borderRadius: 12, padding: `${k(12)} 16px` }}>
       <Tile Icon={HandCoins} t={t} size={36} glyph={19} radius={10} />
-      <p style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("callout", 14.5), lineHeight: 1.35, color: t.ink }}>{text}</p>
+      <p data-field="financialNote" data-group="callout" style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("callout", 14.5), lineHeight: 1.35, color: t.ink }}>{text}</p>
     </div>
   );
 }
 
-function FactCell({ f, t, first }: { f: Fact; t: Theme; first: boolean }) {
+function FactCell({ f, t, first, i }: { f: Fact; t: Theme; first: boolean; i: number }) {
   const Icon = ICONS[f.icon] || CalendarDays;
   return (
     <div style={{ borderLeft: first ? "none" : `1px solid ${t.rule}`, padding: "12px 12px", display: "flex", gap: 10, alignItems: "flex-start", minWidth: 0 }}>
       <Tile Icon={Icon} t={t} size={30} glyph={16} radius={8} />
       <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-        <span style={{ fontFamily: DM, fontWeight: 600, fontSize: fv("facts", 12), letterSpacing: "0.05em", textTransform: "uppercase", color: t.muted }}>{f.label}</span>
-        <span style={{ fontFamily: PO, fontWeight: 600, fontSize: fv("facts", 16.5), lineHeight: 1.2, color: t.ink }}>{f.value}</span>
-        {f.note ? <span style={{ fontFamily: DM, fontSize: fv("facts", 12), lineHeight: 1.3, color: t.muted }}>{f.note}</span> : null}
+        <span data-field="facts" data-i={i} data-part="label" data-group="facts" style={{ fontFamily: DM, fontWeight: 600, fontSize: fv("facts", 12), letterSpacing: "0.05em", textTransform: "uppercase", color: t.muted }}>{f.label}</span>
+        <span data-field="facts" data-i={i} data-part="value" data-group="facts" style={{ fontFamily: PO, fontWeight: 600, fontSize: fv("facts", 16.5), lineHeight: 1.2, color: t.ink }}>{f.value}</span>
+        {f.note ? <span data-field="facts" data-i={i} data-part="note" data-group="facts" style={{ fontFamily: DM, fontSize: fv("facts", 12), lineHeight: 1.3, color: t.muted }}>{f.note}</span> : null}
       </div>
     </div>
   );
@@ -134,10 +135,14 @@ export interface FitInfo {
   k: number;
   overflow: number;
   heroOverflow: boolean;
+  /** 2 when the content did not fit and continues on a second page */
+  pages?: number;
 }
 
 export interface FlyerHandle {
   node: HTMLDivElement | null;
+  /** the second page, when there is one */
+  node2: HTMLDivElement | null;
 }
 
 interface Props {
@@ -149,10 +154,15 @@ interface Props {
 
 const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, design, brand, onFit }, ref) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const root2Ref = useRef<HTMLDivElement>(null);
+  const main2Ref = useRef<HTMLElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const bandRef = useRef<HTMLDivElement>(null);
   const [fontsReady, setFontsReady] = useState(0);
-  useImperativeHandle(ref, () => ({ node: rootRef.current }), []);
+  useImperativeHandle(ref, () => ({
+    get node() { return rootRef.current; },
+    get node2() { return root2Ref.current; },
+  }), []);
 
   useEffect(() => {
     if (typeof document !== "undefined" && document.fonts) {
@@ -178,35 +188,35 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
 
   const learnBlock = (cols: number) => (
     <Section key="learn">
-      <Head Icon={BookOpen} title={titles.learn} t={t} />
-      <Checklist items={learn} t={t} cols={cols} fs={wide && cols >= 3 ? 12.5 : 13} />
+      <Head Icon={BookOpen} title={titles.learn} t={t} field="titles.learn" />
+      <Checklist items={learn} t={t} cols={cols} fs={wide && cols >= 3 ? 12.5 : 13} field="learn" />
     </Section>
   );
   const careersBlock = (cols: number) => (
     <Section key="careers">
-      <Head Icon={Briefcase} title={titles.careers} t={t} />
-      <Chips items={careers} t={t} cols={cols} />
+      <Head Icon={Briefcase} title={titles.careers} t={t} field="titles.careers" />
+      <Chips items={careers} t={t} cols={cols} field="careers" />
     </Section>
   );
   const admissionBlock = (cols: number) => (
     <Section key="admission">
-      <Head Icon={ClipboardCheck} title={titles.admission} t={t} />
-      <Checklist items={admission} t={t} cols={cols} fs={12.5} />
+      <Head Icon={ClipboardCheck} title={titles.admission} t={t} field="titles.admission" />
+      <Checklist items={admission} t={t} cols={cols} fs={12.5} field="admission" />
     </Section>
   );
   const highlightsBlock = (cols: number) => (
     <Panel key="highlights" t={t}>
-      <PanelHead Icon={Award} title={titles.highlights} t={t} />
-      <Checklist items={highlights} t={t} cols={cols} fs={12.5} />
+      <PanelHead Icon={Award} title={titles.highlights} t={t} field="titles.highlights" />
+      <Checklist items={highlights} t={t} cols={cols} fs={12.5} field="highlights" />
     </Panel>
   );
   const salaryBlock = (
     <Panel key="salary" t={t}>
-      <PanelHead Icon={TrendingUp} title={titles.salary} t={t} />
+      <PanelHead Icon={TrendingUp} title={titles.salary} t={t} field="titles.salary" />
       {salary.map((r, i) => (
         <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2, borderTop: i ? `1px solid ${t.rule}` : "none", paddingTop: i ? k(8) : 0 }}>
-          <span style={{ fontFamily: DM, fontWeight: 600, fontSize: fv("callout", 12), letterSpacing: "0.06em", textTransform: "uppercase", color: t.muted }}>{r.label}</span>
-          <span style={{ fontFamily: PO, fontWeight: 600, fontSize: kv("callout", 19), lineHeight: 1.2, color: t.ink }}>{r.value}</span>
+          <span data-field="salary" data-i={i} data-part="label" data-group="callout" style={{ fontFamily: DM, fontWeight: 600, fontSize: fv("callout", 12), letterSpacing: "0.06em", textTransform: "uppercase", color: t.muted }}>{r.label}</span>
+          <span data-field="salary" data-i={i} data-part="value" data-group="callout" style={{ fontFamily: PO, fontWeight: 600, fontSize: kv("callout", 19), lineHeight: 1.2, color: t.ink }}>{r.value}</span>
         </div>
       ))}
     </Panel>
@@ -253,6 +263,15 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
   }
   if (bottomCallout) rows.push(calloutBlock);
 
+  // Too much for one page: the same blocks one under another, split across two pages.
+  const flowBlocks: ReactNode[] = [];
+  if (learn.length) flowBlocks.push(learnBlock(design.learnCols || (avgLen(learn) > 46 ? 2 : 3)));
+  if (careers.length) flowBlocks.push(careersBlock(3));
+  if (admission.length) flowBlocks.push(admissionBlock(shortAdmission ? 3 : 2));
+  if (highlights.length) flowBlocks.push(highlightsBlock(2));
+  if (salary.length) flowBlocks.push(salaryBlock);
+  if (financial) flowBlocks.push(calloutBlock);
+
   // header title
   const titleLines = (c.titleLine || "").split("\n").map((s) => cleanText(s)).filter(Boolean);
   const longest = Math.max(1, ...titleLines.map((s) => s.length));
@@ -261,6 +280,9 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
 
   const hero = design.headerHeight || 350;
   const fitKey = JSON.stringify([c, design.hidden, design.layout, design.learnCols, design.textSize, hero, brand, design.fontScales]);
+  const [mode, setMode] = useState<{ key: string; flow: boolean; split: number | null }>({ key: "", flow: false, split: null });
+  const flow = mode.key === fitKey && mode.flow;
+  const split = mode.key === fitKey ? mode.split : null;
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -275,6 +297,27 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
       band.style.setProperty("--h", h.toFixed(3));
     }
     const fits = () => main.scrollHeight <= main.clientHeight + 1;
+    const heroOverflow = band.scrollHeight > band.clientHeight + 1;
+    if (flow) {
+      // two pages: comfortable text size, fill page 1 with whole blocks, the rest goes to page 2
+      const kk = design.textSize || 1.04;
+      root.style.setProperty("--k", kk.toFixed(4));
+      root2Ref.current?.style.setProperty("--k", kk.toFixed(4));
+      if (split === null) {
+        const limit = main.clientHeight;
+        let n = 0;
+        for (const ch of Array.from(main.children) as HTMLElement[]) {
+          if (ch.offsetTop + ch.offsetHeight - main.offsetTop > limit + 1) break;
+          n++;
+        }
+        setMode({ key: fitKey, flow: true, split: Math.max(1, Math.min(n, flowBlocks.length - 1)) });
+        return;
+      }
+      const m2 = main2Ref.current;
+      const over2 = m2 ? Math.max(0, m2.scrollHeight - m2.clientHeight - 1) : 0;
+      onFit?.({ k: kk, overflow: over2, heroOverflow, pages: 2 });
+      return;
+    }
     let kk: number;
     if (design.textSize) {
       kk = design.textSize;
@@ -299,15 +342,19 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
       }
       root.style.setProperty("--k", kk.toFixed(4));
     }
-    onFit?.({ k: kk, overflow: Math.max(0, main.scrollHeight - main.clientHeight - 1), heroOverflow: band.scrollHeight > band.clientHeight + 1 });
+    if (!fits() && flowBlocks.length > 1) {
+      setMode({ key: fitKey, flow: true, split: null });
+      return;
+    }
+    onFit?.({ k: kk, overflow: Math.max(0, main.scrollHeight - main.clientHeight - 1), heroOverflow, pages: 1 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fitKey, fontsReady]);
+  }, [fitKey, fontsReady, flow, split]);
 
   const photo = design.photo;
   const footerItems: { Icon: LucideIcon; node: ReactNode }[] = [];
-  if (brand.phone) footerItems.push({ Icon: Phone, node: <span style={{ fontFamily: PO, fontWeight: 600, fontSize: fv("footer", 16), color: t.footerText, letterSpacing: "0.01em" }}>{brand.phone}</span> });
-  if (brand.address) footerItems.push({ Icon: MapPin, node: <span style={{ fontFamily: DM, fontWeight: 500, fontSize: fv("footer", 12.5), lineHeight: 1.3, color: t.footerText }}>{brand.address}</span> });
-  if (brand.website) footerItems.push({ Icon: Globe, node: <span style={{ fontFamily: PO, fontWeight: 600, fontSize: fv("footer", 14), color: t.footerText, letterSpacing: "0.03em" }}>{brand.website}</span> });
+  if (brand.phone) footerItems.push({ Icon: Phone, node: <span data-field="brand.phone" data-group="footer" style={{ fontFamily: PO, fontWeight: 600, fontSize: fv("footer", 16), color: t.footerText, letterSpacing: "0.01em" }}>{brand.phone}</span> });
+  if (brand.address) footerItems.push({ Icon: MapPin, node: <span data-field="brand.address" data-group="footer" style={{ fontFamily: DM, fontWeight: 500, fontSize: fv("footer", 12.5), lineHeight: 1.3, color: t.footerText }}>{brand.address}</span> });
+  if (brand.website) footerItems.push({ Icon: Globe, node: <span data-field="brand.website" data-group="footer" style={{ fontFamily: PO, fontWeight: 600, fontSize: fv("footer", 14), color: t.footerText, letterSpacing: "0.03em" }}>{brand.website}</span> });
 
   const scaleVars: Record<string, number> = {};
   for (const [key, val] of Object.entries(design.fontScales || {})) if (typeof val === "number" && val > 0) scaleVars[`--s-${key}`] = val;
@@ -318,6 +365,7 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
   };
 
   return (
+    <div className="flyer-pages" style={{ display: "flex", flexDirection: "column", gap: PAGE_GAP }}>
     <div ref={rootRef} className="flyer-root" style={rootStyle}>
       <header style={{ height: hero, display: "flex", flexShrink: 0 }}>
         <div ref={bandRef} style={{ width: 470, background: t.band, boxSizing: "border-box", padding: `52px 28px 54px ${MX}px`, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 12, overflow: "hidden" }}>
@@ -327,34 +375,34 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
             {companyTag.some(Boolean) ? (
               <>
                 <div style={{ width: 1, height: 36, background: t.bandText, opacity: 0.45 }} />
-                <p style={{ margin: 0, fontFamily: PO, fontWeight: 500, fontStyle: "italic", fontSize: fv("tagline", 12.5), lineHeight: 1.35, color: t.bandText, whiteSpace: "pre-line" }}>{companyTag.join("\n")}</p>
+                <p data-field="brand.companyTagline" data-group="tagline" style={{ margin: 0, fontFamily: PO, fontWeight: 500, fontStyle: "italic", fontSize: fv("tagline", 12.5), lineHeight: 1.35, color: t.bandText, whiteSpace: "pre-line" }}>{companyTag.join("\n")}</p>
               </>
             ) : null}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: hs(8) }}>
             {c.eyebrow ? (
-              <span style={{ fontFamily: PO, fontWeight: 600, fontSize: hv("tagline", 12), letterSpacing: "0.16em", textTransform: "uppercase", color: t.eyebrow }}>{cleanText(c.eyebrow)}</span>
+              <span data-field="eyebrow" data-group="tagline" style={{ fontFamily: PO, fontWeight: 600, fontSize: hv("tagline", 12), letterSpacing: "0.16em", textTransform: "uppercase", color: t.eyebrow }}>{cleanText(c.eyebrow)}</span>
             ) : null}
             <h1 style={{ margin: 0, display: "flex", flexDirection: "column", color: t.bandText }}>
               {titleLines.map((line, i) => (
-                <span key={i} style={{ fontFamily: PO, fontWeight: c.bigCode ? 600 : 700, fontSize: hv("title", titleSize), lineHeight: 1.1 }}>{line}</span>
+                <span key={i} data-field="titleLine" data-i={i} data-group="title" style={{ fontFamily: PO, fontWeight: c.bigCode ? 600 : 700, fontSize: hv("title", titleSize), lineHeight: 1.1 }}>{line}</span>
               ))}
               {c.bigCode ? (
-                <span style={{ fontFamily: PO, fontWeight: 700, fontSize: hv("code", 80), lineHeight: 0.9, letterSpacing: "-0.02em", color: t.big }}>{cleanText(c.bigCode)}</span>
+                <span data-field="bigCode" data-group="code" style={{ fontFamily: PO, fontWeight: 700, fontSize: hv("code", 80), lineHeight: 0.9, letterSpacing: "-0.02em", color: t.big }}>{cleanText(c.bigCode)}</span>
               ) : null}
             </h1>
             {c.pill ? (
-              <span style={{ alignSelf: "flex-start", background: t.pillBg, color: t.pillText, fontFamily: PO, fontWeight: 600, fontSize: hv("tagline", 14), lineHeight: 1, padding: "8px 14px", borderRadius: 999 }}>{cleanText(c.pill)}</span>
+              <span data-field="pill" data-group="tagline" style={{ alignSelf: "flex-start", background: t.pillBg, color: t.pillText, fontFamily: PO, fontWeight: 600, fontSize: hv("tagline", 14), lineHeight: 1, padding: "8px 14px", borderRadius: 999 }}>{cleanText(c.pill)}</span>
             ) : null}
             {c.tagline && !hide.tagline ? (
-              <p style={{ margin: "4px 0 0", fontFamily: PO, fontWeight: 600, fontStyle: "italic", fontSize: hv("tagline", 16.5), lineHeight: 1.3, color: t.tagline }}>{cleanText(c.tagline)}</p>
+              <p data-field="tagline" data-group="tagline" style={{ margin: "4px 0 0", fontFamily: PO, fontWeight: 600, fontStyle: "italic", fontSize: hv("tagline", 16.5), lineHeight: 1.3, color: t.tagline }}>{cleanText(c.tagline)}</p>
             ) : null}
             {c.intro && !hide.intro ? (
-              <p style={{ margin: 0, fontFamily: DM, fontSize: hv("tagline", 13.5), lineHeight: 1.5, color: t.bandMuted }}>{cleanText(c.intro)}</p>
+              <p data-field="intro" data-group="tagline" style={{ margin: 0, fontFamily: DM, fontSize: hv("tagline", 13.5), lineHeight: 1.5, color: t.bandMuted }}>{cleanText(c.intro)}</p>
             ) : null}
           </div>
         </div>
-        <div style={{ flex: 1, minWidth: 0, overflow: "hidden", position: "relative" }}>
+        <div data-field="photo" style={{ flex: 1, minWidth: 0, overflow: "hidden", position: "relative" }}>
           {photo.src ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -375,13 +423,13 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
       {facts.length ? (
         <div style={{ margin: `-34px ${MX}px 0`, background: "#FFFFFF", border: `1px solid ${t.rule}`, borderRadius: 12, boxShadow: "0 6px 18px rgba(20, 30, 40, 0.08)", display: "grid", gridTemplateColumns: facts.map((f) => factColumn(f, design.fontScales?.facts ?? 1)).join(" "), position: "relative" }}>
           {facts.map((f, i) => (
-            <FactCell key={i} f={{ ...f, label: cleanText(f.label), value: cleanText(f.value), note: cleanText(f.note) }} t={t} first={i === 0} />
+            <FactCell key={i} i={i} f={{ ...f, label: cleanText(f.label), value: cleanText(f.value), note: cleanText(f.note) }} t={t} first={i === 0} />
           ))}
         </div>
       ) : null}
 
       <main ref={mainRef} style={{ flex: 1, minHeight: 0, boxSizing: "border-box", padding: `18px ${MX}px 20px`, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: k(16), overflow: "hidden" }}>
-        {rows}
+        {flow ? (split === null ? flowBlocks : flowBlocks.slice(0, split)) : rows}
       </main>
 
       <footer style={{ height: 60, flexShrink: 0, background: t.footer, boxSizing: "border-box", padding: `0 ${MX}px 12px`, display: "flex", alignItems: "center", justifyContent: footerItems.length > 1 ? "space-between" : "center" }}>
@@ -393,6 +441,31 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
           </div>,
         ])}
       </footer>
+    </div>
+    {flow && split !== null ? (
+      <div ref={root2Ref} className="flyer-root flyer-page2" style={rootStyle}>
+        <header style={{ height: 150, flexShrink: 0, background: t.band, boxSizing: "border-box", padding: `0 ${MX}px`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={t.logo === "white" ? "/logo-white.svg" : "/logo-navy.svg"} alt="BOSS Consultancy Services Ltd." style={{ height: 42, width: "auto", display: "block", marginLeft: -6 }} />
+          <div style={{ textAlign: "right", color: t.bandText }}>
+            <div style={{ fontFamily: PO, fontWeight: 700, fontSize: 24, lineHeight: 1.15 }}>{[...titleLines, cleanText(c.bigCode || "")].filter(Boolean).join(" ")}</div>
+            <div style={{ fontFamily: PO, fontWeight: 600, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: t.eyebrow, marginTop: 6 }}>Continued · page 2</div>
+          </div>
+        </header>
+        <main ref={main2Ref} style={{ flex: 1, minHeight: 0, boxSizing: "border-box", padding: `28px ${MX}px 24px`, display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: k(22), overflow: "hidden" }}>
+          {flowBlocks.slice(split)}
+        </main>
+      <footer style={{ height: 60, flexShrink: 0, background: t.footer, boxSizing: "border-box", padding: `0 ${MX}px 12px`, display: "flex", alignItems: "center", justifyContent: footerItems.length > 1 ? "space-between" : "center" }}>
+        {footerItems.flatMap(({ Icon, node }, i) => [
+          i > 0 ? <div key={`d${i}`} style={{ width: 1, height: 24, background: t.footerDivider }} /> : null,
+          <div key={`f${i}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon size={17} color={t.footerIcon} strokeWidth={2} aria-hidden />
+            {node}
+          </div>,
+        ])}
+      </footer>
+      </div>
+    ) : null}
     </div>
   );
 });

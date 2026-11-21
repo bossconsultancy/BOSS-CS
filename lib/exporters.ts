@@ -25,21 +25,27 @@ async function opts(node: HTMLElement) {
   return { width: W, height: H, pixelRatio: PRINT_RATIO, cacheBust: true, fontEmbedCSS, style: { transform: "none", margin: "0" } };
 }
 
-export async function exportPng(node: HTMLElement, name: string) {
+export async function exportPng(node: HTMLElement, name: string, node2?: HTMLElement | null) {
   const dataUrl = await toPng(node, await opts(node));
-  download(dataUrl, `${fileSafe(name)}-print.png`);
+  download(dataUrl, `${fileSafe(name)}-print${node2 ? "-page-1" : ""}.png`);
+  if (node2) download(await toPng(node2, await opts(node2)), `${fileSafe(name)}-print-page-2.png`);
 }
 
-export async function exportPdf(node: HTMLElement, name: string) {
-  const dataUrl = await toJpeg(node, { ...(await opts(node)), quality: 0.95, backgroundColor: "#ffffff" });
+export async function exportPdf(node: HTMLElement, name: string, node2?: HTMLElement | null) {
   const pdf = new jsPDF({ orientation: "portrait", unit: "in", format: [8.75, 11.25], compress: true });
-  pdf.addImage(dataUrl, "JPEG", 0, 0, 8.75, 11.25, undefined, "FAST");
+  const pages = [node, ...(node2 ? [node2] : [])];
+  for (let i = 0; i < pages.length; i++) {
+    const dataUrl = await toJpeg(pages[i], { ...(await opts(pages[i])), quality: 0.95, backgroundColor: "#ffffff" });
+    if (i) pdf.addPage([8.75, 11.25], "portrait");
+    pdf.addImage(dataUrl, "JPEG", 0, 0, 8.75, 11.25, undefined, "FAST");
+  }
   pdf.save(`${fileSafe(name)}-print.pdf`);
 }
 
-export async function exportSocialJpg(node: HTMLElement, name: string) {
+export async function exportSocialJpg(node: HTMLElement, name: string, node2?: HTMLElement | null) {
   const dataUrl = await toJpeg(node, { ...(await opts(node)), pixelRatio: 1.5, quality: 0.9, backgroundColor: "#ffffff" });
-  download(dataUrl, `${fileSafe(name)}-web.jpg`);
+  download(dataUrl, `${fileSafe(name)}-web${node2 ? "-page-1" : ""}.jpg`);
+  if (node2) download(await toJpeg(node2, { ...(await opts(node2)), pixelRatio: 1.5, quality: 0.9, backgroundColor: "#ffffff" }), `${fileSafe(name)}-web-page-2.jpg`);
 }
 
 export function exportJson(data: unknown, name: string) {

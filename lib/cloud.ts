@@ -208,3 +208,56 @@ export async function readPhoto(pathname: string): Promise<{ statusCode: number;
   }
   return get(pathname, { access: "private" });
 }
+
+/* ---- Company profile booklet (one shared, editable copy for the whole team) ---- */
+
+export type BookletLang = "ta" | "en";
+const bookletPath = (lang: BookletLang) => (lang === "en" ? "booklet/current-en.html" : "booklet/current.html");
+
+export async function loadCloudBooklet(lang: BookletLang = "ta"): Promise<{ html: string; etag: string } | null> {
+  const r = await readText(bookletPath(lang));
+  return r ? { html: r.text, etag: r.etag } : null;
+}
+
+export class BookletConflictError extends Error {
+  constructor() {
+    super("conflict");
+  }
+}
+
+/** Saves the edited booklet. `etag` guards against overwriting someone else's newer save. */
+export async function saveCloudBooklet(html: string, etag: string | null, lang: BookletLang = "ta"): Promise<{ etag: string }> {
+  const BOOKLET_PATH = bookletPath(lang);
+  try {
+    const res = MOCK
+      ? await (await mockFs()).write(BOOKLET_PATH, html, etag ? { ifMatch: etag } : { allowOverwrite: false })
+      : await put(BOOKLET_PATH, html, {
+          access: "private",
+          contentType: "text/html; charset=utf-8",
+          addRandomSuffix: false,
+          cacheControlMaxAge: 60,
+          ...(etag ? { ifMatch: etag } : { allowOverwrite: false }),
+        });
+    return { etag: res.etag };
+  } catch (e) {
+    if (e instanceof BlobPreconditionFailedError || (e instanceof Error && /already exists|precondition/i.test(e.message))) throw new BookletConflictError();
+    throw e;
+  }
+}
+
+/** "Back to the original": moves the team's edited copy to trash (recoverable by an admin). */
+export async function resetCloudBooklet(lang: BookletLang = "ta"): Promise<void> {
+  const BOOKLET_PATH = bookletPath(lang);
+  const to = `trash/booklet-${lang}-${Date.now()}.html`;
+  try {
+    if (MOCK) return (await mockFs()).rename(BOOKLET_PATH, to);
+    await rename(BOOKLET_PATH, to, { access: "private" });
+  } catch {
+    // nothing saved yet
+  }
+}
+
+/** Stores a photo placed into the booklet and returns its app URL. */
+export async function storeBookletPhoto(dataUrl: string): Promise<string> {
+  return storePhoto("booklet", dataUrl);
+}

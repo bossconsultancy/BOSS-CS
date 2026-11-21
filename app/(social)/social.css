@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper: 238 242 245;
+  --paper-2: 227 233 238;
+  --card: 255 255 255;
+  --ink: 38 57 74;
+  --ink-2: 48 70 86;
+  --muted: 93 107 118;
+  --rule: 214 222 228;
+  --live: 47 109 246;
+  --night: 38 57 74;
+  --night-2: 48 70 86;
+}
+
+html,
+body {
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
+}
+
+
+@layer components {
+  .meta {
+    @apply font-sans font-semibold text-[11px] uppercase tracking-[0.08em];
+  }
+  .rule-double {
+    border-top: 3px solid rgb(var(--ink));
+    border-bottom: 1px solid rgb(var(--ink));
+    height: 6px;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-ink {
+    @apply btn bg-ink text-paper hover:bg-black;
+  }
+  .btn-line {
+    @apply btn border border-ink/80 bg-transparent text-ink hover:bg-ink hover:text-paper;
+  }
+  .btn-ghost-night {
+    @apply btn border border-white/15 bg-white/5 text-white hover:bg-white/15;
+  }
+  .input {
+    @apply w-full rounded-xl border border-rule bg-card px-3.5 py-2.5 text-[15px] text-ink outline-none transition placeholder:text-muted/70 focus:border-ink focus:ring-4 focus:ring-ink/5;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-rule bg-card px-3 py-1.5 text-[13px] font-medium text-ink2 transition hover:border-ink;
+  }
+  .chip-on {
+    @apply border-ink bg-ink text-paper hover:border-ink;
+  }
+  .label {
+    @apply meta mb-2 block text-muted;
+  }
+}
+
+::selection {
+  background: #15120f;
+  color: #f2eee5;
+}

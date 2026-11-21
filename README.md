@@ -1,4 +1,34 @@
-# BOSS Flyer Studio
+# BOSS Studio
+
+One website for the BOSS team, behind one password. The home page has four tiles:
+
+| Tile | Address | What it does |
+|---|---|---|
+| Department news | `/news` | Pulls today's verified topics for each department and designs the posts (English or தமிழ்). |
+| Social media posts | `/social` | Turn your own idea into a post or carousel, in English or Tamil. Tamil is rewritten naturally, not translated word for word. |
+| Flyers | `/flyers` | Program flyers from pasted course details (the former BOSS Flyer Studio). |
+| Company profile booklet | `/booklet` | The 40-page booklet in Tamil **and English**, edited like Figma (see below). |
+
+## Settings on Vercel (Project > Settings > Environment Variables)
+
+Required: `OPENAI_API_KEY`, `APP_PASSWORD`, and Blob storage connected (adds `BLOB_READ_WRITE_TOKEN`).
+Optional: `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_QUALITY` (posts use medium, about $0.05 a post), `SOCIAL_TEXT_MODEL` (default `gpt-4o-mini`), `OPENAI_DESIGN_MODEL`, `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` (free backup image maker), `DAILY_AI_LIMIT`.
+Turn on **Fluid Compute** so image requests are not cut off. After adding a setting, redeploy.
+
+Posts saved on the old Render site (Cloudflare KV) do not move over. Once this site is live, the Render site can be switched off.
+
+## Booklet editing (Tamil and English)
+
+- Switch language with **தமிழ் | English** in the top bar. Each language has its own saved copy, shared with the whole team.
+- Every title, paragraph, photo, line and box is its own layer (nothing is grouped).
+- Point at anything: a blue outline and a pencil appear. Click the pencil, double-click, or press Enter to type in text.
+- Click to select, drag to move, pull a handle to resize (hold Shift on a photo corner to keep its shape). Arrow keys nudge 1px, Shift + arrow nudges 10px. Delete removes the layer, and Esc lets go.
+- Undo and redo: Cmd/Ctrl + Z and Cmd/Ctrl + Shift + Z.
+- Download PDF, PNG or HTML for the language you are viewing.
+
+---
+
+# Flyers (former BOSS Flyer Studio)
 
 A small website for the BOSS team: paste course information, and it builds a print-ready program flyer in the BOSS design, with an AI-generated photo. Everything can be edited before downloading.
 
@@ -54,6 +84,21 @@ You need a free GitHub account and a free Vercel account.
    If OpenAI renames or retires a model, the app shows the error message. Change the variable to a current model name and redeploy.
 
 Photo generation can take up to a minute. On Vercel's free plan, if photos time out, turn on **Fluid Compute** in the project settings (it allows longer requests).
+
+## Company profile booklet
+
+Open **Booklet** in the top bar (or go to `/booklet`). The 40 page Tamil company profile opens page by page and everything on it can be changed in the browser:
+
+- **Text**: click any line and type. Colour, bold, italic, size and alignment are in the panel on the left.
+- **Tamil**: the booklet is set in the Bamini fonts, where Latin letters stand for Tamil glyphs. Type normal Unicode Tamil in the box on the left and press **Replace this text**, and it is converted for you. English words inside Tamil lines keep the Latin font.
+- **Photos**: click a photo to put your own in its place, and slide it across or up and down so faces stay in view.
+- **Blocks**: Add text, Copy and Delete; arrow keys move the selected block (hold Shift for 10px steps).
+- **Undo / Redo**: Cmd/Ctrl + Z, and Cmd/Ctrl + Shift + Z.
+- **Saving**: changes are kept in your browser on this computer, page by page, and come back when you open it again. **Back to the original** puts every page back.
+- **Ask for a change**: select something and type what you want in plain language ("shorten this heading", "say it in simpler Tamil", "make the text navy and a bit bigger"). This is the one part of the booklet page that uses OpenAI, with the same `OPENAI_API_KEY` as the flyers, so it costs the usual few cents per request. Everything else on this page is free.
+- **Downloads**: PDF (all 40 pages), PNG of the page you are on at 300 dpi, HTML (one file with the fonts and photos inside, editable offline), and Print, where "Save as PDF" gives sharp vector text.
+
+Apart from **Ask for a change**, nothing on this page uses AI, so day to day editing costs nothing. To replace the booklet with a newer version, drop the new `pages.html`, `booklet.css` and `assets/` into `public/booklet/`.
 
 ## Costs
 

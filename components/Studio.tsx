@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Check, CloudOff, Redo2, Undo2, Copy, Download, FileDown, FileUp, FolderOpen, ImageDown, Plus, Printer, RefreshCw, Search, Sparkles, Trash2, Upload, Users, X } from "lucide-react";
-import Flyer, { FLYER_H, FLYER_W, type FitInfo, type FlyerHandle } from "./Flyer";
+import { BookOpen, Check, CloudOff, Redo2, Undo2, Copy, Download, FileDown, FileUp, FolderOpen, ImageDown, Plus, Printer, RefreshCw, Search, Sparkles, Trash2, Upload, Users, X, Home, LayoutGrid } from "lucide-react";
+import FlyerGallery from "./FlyerGallery";
+import { useFlyerEdit } from "./FlyerEdit";
+import Flyer, { FLYER_H, FLYER_W, PAGE_GAP, type FitInfo, type FlyerHandle } from "./Flyer";
 import { BrandPanel, ContentPanel, DesignPanel, PhotoPanel } from "./Panels";
 import { Toggle } from "./ui";
 import { buildImagePrompt } from "@/lib/prompt";
@@ -21,6 +23,7 @@ function blankProject(): Project {
 export default function Studio() {
   const [project, setProject] = useState<Project | null>(null);
   const [tab, setTab] = useState<Tab>("start");
+  const [view, setView] = useState<"gallery" | "editor">("gallery");
   const [pasted, setPasted] = useState("");
   const [alsoPhoto, setAlsoPhoto] = useState(true);
   const [parsing, setParsing] = useState(false);
@@ -48,6 +51,7 @@ export default function Studio() {
   const saveSeq = useRef(0);
   const flyerRef = useRef<FlyerHandle>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   // load the last flyer (team library first, then this browser), or start from the PSW template
@@ -330,13 +334,15 @@ export default function Studio() {
 
   const doExport = async (kind: "png" | "pdf" | "jpg") => {
     const node = flyerRef.current?.node;
+    const node2 = flyerRef.current?.node2 || null;
     if (!node || !project) return;
+    fe.clear();
     setBusy(kind);
     setError("");
     try {
-      if (kind === "png") await exportPng(node, project.name);
-      else if (kind === "pdf") await exportPdf(node, project.name);
-      else await exportSocialJpg(node, project.name);
+      if (kind === "png") await exportPng(node, project.name, node2);
+      else if (kind === "pdf") await exportPdf(node, project.name, node2);
+      else await exportSocialJpg(node, project.name, node2);
     } catch (e) {
       setError(`Export failed: ${e instanceof Error ? e.message : "unknown error"}`);
     } finally {
@@ -349,19 +355,31 @@ export default function Studio() {
     if (cloud) loadTeam();
   };
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const fe = useFlyerEdit({ box: previewRef, project, update, scale, onPhoto: () => setTab("photo") });
+
+  if (view === "gallery")
+    return (
+      <FlyerGallery
+        cloud={cloud}
+        onOpen={(p, etag) => { if (project) saveNow(project); openProject(p, etag); setView("editor"); }}
+        onNew={() => { if (project) saveNow(project); const p = blankProject(); lastSaved.current = JSON.stringify(p); setConflict(null); setSaveState("idle"); setProject(p); setPasted(""); setMissing([]); setTab("start"); setView("editor"); }}
+      />
+    );
   if (!project) return <div className="loading">Loading…</div>;
 
   const scaledW = FLYER_W * scale;
-  const scaledH = FLYER_H * scale;
+  const pages = fit.pages === 2 ? 2 : 1;
+  const scaledH = (FLYER_H * pages + PAGE_GAP * (pages - 1)) * scale;
 
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand-mark">
+        <a className="brand-mark" href="/" title="Back to home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-navy.svg" alt="BOSS" />
           <span>Flyer Studio</span>
-        </div>
+        </a>
         <input className="input name-input" value={project.name} onChange={(e) => update({ name: e.target.value })} aria-label="Flyer name" />
         {cloud ? (
           <span className={`save-state ${saveState}`} title={saveError || undefined}>
@@ -387,6 +405,15 @@ export default function Studio() {
           <button type="button" className="btn" onClick={() => { const p = blankProject(); lastSaved.current = JSON.stringify(p); setConflict(null); setSaveState("idle"); setProject(p); setPasted(""); setMissing([]); setTab("start"); }}>
             <Plus size={15} /> New
           </button>
+          <a className="btn" href="/" title="All BOSS tools">
+            <Home size={15} /> Home
+          </a>
+          <button type="button" className="btn" onClick={() => { saveNow(project); setView("gallery"); }} title="See all flyers">
+            <LayoutGrid size={15} /> All flyers
+          </button>
+          <a className="btn" href="/booklet" title="The company profile booklet">
+            <BookOpen size={15} /> Booklet
+          </a>
           <button type="button" className="btn" onClick={openLibrary}>
             <FolderOpen size={15} /> {cloud ? "Team flyers" : "My flyers"}
           </button>
@@ -422,6 +449,7 @@ export default function Studio() {
             ))}
           </nav>
           <div className="panel-scroll">
+            {fe.card}
             {error ? (
               <div className="note error">
                 {error}
@@ -551,7 +579,9 @@ export default function Studio() {
 
         <section className="stage" ref={stageRef}>
           <div className="stage-status">
-            {fit.overflow > 0 ? (
+            {fit.pages === 2 && fit.overflow <= 0 ? (
+              <span className="pill ok">Too much for one page, so it continues on page 2. PDF has both pages.</span>
+            ) : fit.overflow > 0 ? (
               <span className="pill bad">Too much text: about {Math.ceil(fit.overflow)}px over. Shorten a list, hide a section, lower the header or switch layout.</span>
             ) : fit.heroOverflow ? (
               <span className="pill bad">The headline is too long for the header. Shorten it or raise the header height.</span>
@@ -560,12 +590,13 @@ export default function Studio() {
             )}
             {generating ? <span className="pill"><RefreshCw size={12} className="spin" /> Generating photo…</span> : null}
           </div>
-          <div className="preview-box" style={{ width: scaledW, height: scaledH }}>
+          <div className="preview-box fe-box" ref={previewRef} style={{ width: scaledW, height: scaledH }}>
             <div className="preview-scale" style={{ transform: `scale(${scale})` }}>
               <Flyer ref={flyerRef} content={project.content} design={project.design} brand={project.brand} onFit={setFit} />
             </div>
           </div>
-          <p className="stage-foot">US Letter with 0.125 in bleed (8.75 x 11.25 in). Keep important text away from the edges.</p>
+          {fe.overlays}
+          <p className="stage-foot">Point at any text and click the pencil to edit it on the flyer. US Letter with 0.125 in bleed (8.75 x 11.25 in). Keep important text away from the edges.</p>
         </section>
       </div>
 
