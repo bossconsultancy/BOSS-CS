@@ -12,6 +12,16 @@ const TEMPLATES: Record<string, string> = { notice: "notice.html", blank: "blank
 export async function GET() {
   if (!cloudEnabled()) return NextResponse.json({ error: "The team library is not set up yet." }, { status: 501 });
   let docs = await listGeneral();
+  // the first notice copied the sample's look; switch it to the BOSS design (wording unchanged)
+  const old = docs.filter((d) => !d.html.includes("data-tpl") && d.html.includes("rgb(215, 38, 46)") && /notice to all clients/i.test(d.name));
+  if (old.length) {
+    const html = await fs.readFile(path.join(/* turbopackIgnore: true */ process.cwd(), "public", "general", "notice.html"), "utf8");
+    for (const d of old) {
+      d.html = html;
+      d.updatedAt = Date.now();
+      await saveGeneral(d);
+    }
+  }
   if (!docs.length) {
     // first visit: start the library with the notice to clients and visitors
     const html = await fs.readFile(path.join(/* turbopackIgnore: true */ process.cwd(), "public", "general", "notice.html"), "utf8");
