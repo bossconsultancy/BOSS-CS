@@ -48,6 +48,8 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
   const [noteDraft, setNoteDraft] = useState("");
   const [noteBusy, setNoteBusy] = useState(false);
   const [noteMsg, setNoteMsg] = useState("");
+  // right-click menu on a piece, or a small "Add note" button where you clicked an empty spot
+  const [menu, setMenu] = useState<{ x: number; y: number; page: number; px: number; py: number; item: HTMLElement | null } | null>(null);
   const [aiNote, setAiNote] = useState("");
   const [, force] = useState(0);
   const cloud = useRef(false);
@@ -100,6 +102,7 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
       const html: string = saved || (SRC ? await fetch(SRC).then((r) => r.text() as Promise<string>) : "");
       if (dead || !stage.current) return;
       stage.current.innerHTML = html;
+      giveTextRoom(stage.current);
       setCount(stage.current.querySelectorAll("section.sheet").length);
       setEdited(!!saved);
       setReady(true);
@@ -342,8 +345,29 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
       const it = itemOf(e.target as HTMLElement);
       setHover((h) => (h === it ? h : it));
     };
+    const spotOf = (e: MouseEvent, t: HTMLElement) => {
+      const sheet = t.closest?.("section.sheet");
+      if (!sheet) return null;
+      const r = sheet.getBoundingClientRect();
+      const k = r.width / PAGE_W;
+      return { page: pageOf(t), px: Math.round((e.clientX - r.left) / k), py: Math.round((e.clientY - r.top) / k) };
+    };
+    const isBackground = (el: HTMLElement | null) => !el || el.offsetWidth >= PAGE_W - 40;
+    const ctx = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest?.('[contenteditable="true"]')) return; // keep the normal menu while typing (spelling, paste)
+      const spot = spotOf(e, t);
+      if (!spot) return;
+      e.preventDefault();
+      const item = itemOf(t);
+      const piece = isBackground(item) ? null : item;
+      if (piece && piece !== sel) pick(piece);
+      setMenu({ x: e.clientX, y: e.clientY, ...spot, item: piece });
+    };
     const down = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
+      if (e.button === 2) return;
+      setMenu(null);
       if (noteMode) {
         e.preventDefault();
         setNoteMode(false);
@@ -360,7 +384,14 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
       }
       if (t.closest?.('[contenteditable="true"]')) return; // typing: let the caret move
       const box = itemOf(t);
-      if (!box) { if (!t.closest?.(".bk-handle")) clearSel(); return; }
+      if (!box || (isBackground(box) && !t.closest?.("[data-kind='text']"))) {
+        if (!t.closest?.(".bk-handle")) {
+          clearSel();
+          const spot = spotOf(e, t);
+          if (spot) setMenu({ x: e.clientX, y: e.clientY, ...spot, item: null });
+        }
+        if (!box) return;
+      }
       e.preventDefault();
       if (editing) editing.blur();
       if (box !== sel) pick(box);
@@ -427,6 +458,7 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
     host.addEventListener("mousemove", move);
     host.addEventListener("mouseleave", leave);
     host.addEventListener("mousedown", down);
+    host.addEventListener("contextmenu", ctx);
     host.addEventListener("dblclick", dbl);
     host.addEventListener("input", input);
     host.addEventListener("focusout", out, true);
@@ -439,6 +471,7 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
       host.removeEventListener("mousemove", move);
       host.removeEventListener("mouseleave", leave);
       host.removeEventListener("mousedown", down);
+      host.removeEventListener("contextmenu", ctx);
       host.removeEventListener("dblclick", dbl);
       host.removeEventListener("input", input);
       host.removeEventListener("focusout", out, true);
@@ -737,6 +770,7 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
     past.current = [];
     future.current = [];
     stage.current.innerHTML = html;
+    giveTextRoom(stage.current);
     setEdited(false);
     setSaveState("idle");
   };
@@ -932,7 +966,26 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
 
         <div className="stage bk-stage-wrap">
           {!ready && <p className="stage-foot">Opening the booklet…</p>}
-          <div ref={stage} className="bk-stage" style={{ zoom }} />
+          {/* scaled with a transform, not CSS zoom: text keeps its exact full-size layout in every browser (Firefox re-wraps zoomed text) */}
+          <div className="bk-sizer" style={{ width: PAGE_W * zoom, height: Math.max(1, count * PAGE_H + Math.max(0, count - 1) * 24) * zoom }}>
+            <div ref={stage} className="bk-stage" style={{ width: PAGE_W, transform: `scale(${zoom})`, transformOrigin: "0 0" }} />
+          </div>
+          {menu && (
+            <div className={`bk-menu${menu.item ? "" : " spot"}`} style={{ left: Math.min(menu.x + 6, window.innerWidth - 200), top: Math.min(menu.y + 6, window.innerHeight - 160) }} onMouseDown={(e) => e.stopPropagation()}>
+              <button type="button" onClick={() => {
+                const m = menu;
+                setMenu(null);
+                if (m.item && m.item.isConnected) startNoteOn(m.item);
+                else { setNoteOpen({ page: m.page, id: null, x: m.px, y: m.py }); setNoteDraft(""); setNoteMsg(""); }
+              }}><MessageSquarePlus size={14} /> Add note</button>
+              {menu.item && (
+                <>
+                  <button type="button" onClick={() => { setMenu(null); duplicate(); }}><Copy size={14} /> Copy</button>
+                  <button type="button" onClick={() => { setMenu(null); remove(); }}><Trash2 size={14} /> Delete</button>
+                </>
+              )}
+            </div>
+          )}
           {allNotes.map(({ page, n, num }) => {
             const p = pinAt(page, n);
             return p ? (
@@ -990,6 +1043,29 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
       </div>
     </div>
   );
+}
+
+/**
+ * Text boxes were measured to fit their words exactly in Chrome; other browsers (Firefox, Safari) draw
+ * text a hair wider and then push the last word onto a new line, so text runs into what is below.
+ * Give every text box a little room once (kept left, centre or right where it was).
+ */
+function giveTextRoom(root: HTMLElement) {
+  root.querySelectorAll("section.sheet").forEach((sheet) => {
+    const s = sheet as HTMLElement;
+    if (s.dataset.room === "1") return;
+    s.querySelectorAll('[data-kind="text"]').forEach((el) => {
+      const t = el as HTMLElement;
+      const w = parseFloat(t.style.width);
+      if (!w) return;
+      const extra = Math.max(4, Math.round(w * 0.04));
+      const al = t.style.textAlign;
+      t.style.width = `${(w + extra).toFixed(2)}px`;
+      const left = parseFloat(t.style.left);
+      if (!isNaN(left) && (al === "center" || al === "right" || al === "end")) t.style.left = `${(left - (al === "center" ? extra / 2 : extra)).toFixed(2)}px`;
+    });
+    s.dataset.room = "1";
+  });
 }
 
 function esc(s: string) {

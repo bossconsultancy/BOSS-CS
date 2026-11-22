@@ -342,3 +342,12 @@ a.brand-mark { color: inherit; text-decoration: none; }
 .bk-note-num { flex: none; width: 20px; height: 20px; border-radius: 50%; background: #F5A524; color: #1B2B38; font-weight: 700; font-size: 11px; display: grid; place-items: center; }
 .bk-note-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bk-note-page { flex: none; color: var(--muted); font-size: 12px; }
+
+.bk-sizer { position: relative; flex: none; }
+.bk-sizer > .bk-stage { position: absolute; left: 0; top: 0; }
+@media print { .bk-sizer { width: auto !important; height: auto !important; } .bk-sizer > .bk-stage { position: static; transform: none !important; } }
+
+.bk-menu { position: fixed; z-index: 55; min-width: 160px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px rgba(27,43,56,.2); padding: 5px; display: flex; flex-direction: column; }
+.bk-menu button { display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 8px 10px; border-radius: 7px; font: 500 13.5px "DM Sans", sans-serif; color: var(--navy); cursor: pointer; text-align: left; }
+.bk-menu button:hover { background: #eef3f7; }
+.bk-menu.spot { min-width: 0; }
