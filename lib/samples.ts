@@ -188,11 +188,16 @@ export function newId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }
 
+/** Each program has ONE master flyer that everyone edits; its id is fixed so nobody makes a second copy. */
+export const masterId = (t: Template) => `master${t.id.replace(/[^a-z0-9]/gi, "")}`.padEnd(6, "0");
+export const isMasterId = (id: string) => TEMPLATES.some((t) => masterId(t) === id);
+export const templateByName = (name: string) => TEMPLATES.find((t) => t.name.trim().toLowerCase() === (name || "").trim().toLowerCase());
+
 export function projectFromTemplate(t: Template): Project {
   const design = defaultDesign(t.presetId);
   design.headerHeight = t.headerHeight;
   return {
-    id: newId(),
+    id: masterId(t),
     name: t.name,
     updatedAt: Date.now(),
     content: JSON.parse(JSON.stringify(t.content)),

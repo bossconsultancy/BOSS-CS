@@ -8,7 +8,8 @@ import Flyer, { FLYER_H, FLYER_W, PAGE_GAP, type FitInfo, type FlyerHandle } fro
 import { BrandPanel, ContentPanel, DesignPanel, PhotoPanel } from "./Panels";
 import { Toggle } from "./ui";
 import { buildImagePrompt } from "@/lib/prompt";
-import { TEMPLATES, defaultDesign, newId, projectFromTemplate } from "@/lib/samples";
+import { TEMPLATES, defaultDesign, newId, type Template } from "@/lib/samples";
+import { loadMaster } from "@/lib/masters";
 import { deleteProject, lastProjectId, listProjects, loadDefaultBrand, loadProject, saveDefaultBrand, saveProject } from "@/lib/storage";
 import { exportJson, exportPdf, exportPng, exportSocialJpg } from "@/lib/exporters";
 import { getStatus, getUserName, setUserName, teamDelete, teamList, teamLoad, teamSave, type TeamSummary } from "@/lib/teamApi";
@@ -79,8 +80,7 @@ export default function Studio() {
         setProject(p);
         setTab("content");
       } else {
-        const t = projectFromTemplate(TEMPLATES[3]);
-        t.brand = loadDefaultBrand();
+        const t = blankProject();
         lastSaved.current = JSON.stringify(t);
         setProject(t);
       }
@@ -155,6 +155,14 @@ export default function Studio() {
     setProject(p);
     setMissing([]);
     setTab("content");
+  };
+
+  /** Opens the ONE master flyer for a program (everyone edits the same flyer, no copies). */
+  const openMaster = async (t: Template) => {
+    if (project) saveNow(project);
+    const r = await loadMaster(t, !!cloud);
+    openProject(r.project, r.etag);
+    setView("editor");
   };
 
   const startBlank = () => {
@@ -363,6 +371,7 @@ export default function Studio() {
       <FlyerGallery
         cloud={cloud}
         onOpen={(p, etag) => { if (project) saveNow(project); openProject(p, etag); setView("editor"); }}
+        onOpenMaster={openMaster}
         onNew={() => { if (project) saveNow(project); const p = blankProject(); lastSaved.current = JSON.stringify(p); setConflict(null); setSaveState("idle"); setProject(p); setPasted(""); setMissing([]); setTab("start"); setView("editor"); }}
       />
     );
@@ -475,19 +484,6 @@ export default function Studio() {
                   >
                     Keep mine (replace theirs)
                   </button>
-                  <button
-                    type="button"
-                    className="btn small"
-                    onClick={() => {
-                      const copy: Project = { ...project, id: newId(), name: `${project.name} (my copy)`, createdBy: undefined, updatedAt: Date.now() };
-                      lastSaved.current = "";
-                      setConflict(null);
-                      setSaveState("idle");
-                      setProject(copy);
-                    }}
-                  >
-                    Save mine as a copy
-                  </button>
                 </div>
               </div>
             ) : null}
@@ -515,23 +511,14 @@ export default function Studio() {
                 </div>
                 <div className="card open">
                   <div className="card-body">
-                    <h3 className="h3">Or start from an existing flyer</h3>
+                    <h3 className="h3">Open a program flyer (master copy)</h3>
                     <div className="template-list">
                       {TEMPLATES.map((t) => (
                         <button
                           type="button"
                           key={t.id}
                           className="btn ghost"
-                          onClick={() => {
-                            const p = projectFromTemplate(t);
-                            p.brand = loadDefaultBrand();
-                            lastSaved.current = JSON.stringify(p);
-                            setSaveState("idle");
-                            setConflict(null);
-                            setProject(p);
-                            setMissing([]);
-                            setTab("content");
-                          }}
+                          onClick={() => openMaster(t)}
                         >
                           {t.name}
                         </button>
@@ -579,9 +566,7 @@ export default function Studio() {
 
         <section className="stage" ref={stageRef}>
           <div className="stage-status">
-            {fit.pages === 2 && fit.overflow <= 0 ? (
-              <span className="pill ok">Too much for one page, so it continues on page 2. PDF has both pages.</span>
-            ) : fit.overflow > 0 ? (
+            {fit.overflow > 0 ? (
               <span className="pill bad">Too much text: about {Math.ceil(fit.overflow)}px over. Shorten a list, hide a section, lower the header or switch layout.</span>
             ) : fit.heroOverflow ? (
               <span className="pill bad">The headline is too long for the header. Shorten it or raise the header height.</span>
@@ -648,22 +633,6 @@ export default function Studio() {
                         </button>
                         <button
                           type="button"
-                          className="icon-btn"
-                          title="Make a copy"
-                          aria-label="Make a copy"
-                          onClick={async () => {
-                            const r = await teamLoad(t.id);
-                            if (!r) return;
-                            const copy: Project = { ...r.project, id: newId(), name: `${r.project.name} (copy)`, createdBy: undefined, updatedAt: Date.now() };
-                            openProject(copy);
-                            setLibrary(null);
-                            flash("Copy created. It saves to the team library as you edit.");
-                          }}
-                        >
-                          <Copy size={14} />
-                        </button>
-                        <button
-                          type="button"
                           className={`icon-btn ${confirmDel === t.id ? "danger" : ""}`}
                           title={confirmDel === t.id ? "Click again to delete for everyone" : "Delete"}
                           aria-label="Delete"
@@ -726,7 +695,7 @@ export default function Studio() {
                           <small>{new Date(p.updatedAt).toLocaleString()}</small>
                         </span>
                       </button>
-                      <button type="button" className="icon-btn" title="Duplicate" aria-label="Duplicate" onClick={async () => { const d = { ...p, id: newId(), name: `${p.name} (copy)`, updatedAt: Date.now() }; await saveProject(d); setLibrary(await listProjects()); }}><Copy size={14} /></button>
+                      
                       <button
                         type="button"
                         className={`icon-btn ${confirmDel === p.id ? "danger" : ""}`}

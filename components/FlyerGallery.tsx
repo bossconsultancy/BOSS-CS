@@ -8,8 +8,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Home, Pencil, Plus, Search } from "lucide-react";
 import Flyer, { FLYER_H, FLYER_W } from "./Flyer";
-import { TEMPLATES, projectFromTemplate } from "@/lib/samples";
-import { listProjects, loadDefaultBrand } from "@/lib/storage";
+import { TEMPLATES, isMasterId, masterId, templateByName, type Template } from "@/lib/samples";
+import { loadMaster } from "@/lib/masters";
+import { listProjects } from "@/lib/storage";
 import { teamList, teamLoad } from "@/lib/teamApi";
 import type { Project } from "@/lib/types";
 
@@ -21,10 +22,12 @@ type Item = { key: string; project: Project; etag?: string; sub: string };
 export default function FlyerGallery({
   cloud,
   onOpen,
+  onOpenMaster,
   onNew,
 }: {
   cloud: boolean | null;
   onOpen: (p: Project, etag?: string) => void;
+  onOpenMaster: (t: Template) => void;
   onNew: () => void;
 }) {
   const [saved, setSaved] = useState<Item[] | null>(null);
@@ -68,18 +71,25 @@ export default function FlyerGallery({
     };
   }, [cloud]);
 
-  const starters = useMemo(
-    () =>
-      TEMPLATES.map((t) => {
-        const p = projectFromTemplate(t);
-        p.brand = loadDefaultBrand();
-        return { t, p };
-      }),
-    [],
-  );
+  // the current master flyer of each program (everyone's latest edits)
+  const [masters, setMasters] = useState<{ t: Template; p: Project; saved: boolean }[] | null>(null);
+  useEffect(() => {
+    if (cloud === null) return;
+    let dead = false;
+    Promise.all(TEMPLATES.map(async (t) => {
+      const r = await loadMaster(t, cloud);
+      return { t, p: r.project, saved: !!r.etag || r.project.updatedBy !== undefined };
+    })).then((m) => { if (!dead) setMasters(m); });
+    return () => { dead = true; };
+  }, [cloud]);
 
   const match = (name: string) => !q.trim() || name.toLowerCase().includes(q.trim().toLowerCase());
-  const shown = (saved || []).filter((i) => match(i.project.name));
+  // other programs (made with New flyer) are their own single master; old duplicates of a program are tucked away
+  const others = (saved || []).filter((i) => !isMasterId(i.project.id) && !templateByName(i.project.name));
+  const olderCopies = (saved || []).filter((i) => !isMasterId(i.project.id) && templateByName(i.project.name));
+  const shown = others.filter((i) => match(i.project.name));
+  void masterId;
+  void useMemo;
 
   return (
     <div className="app fg-app">
@@ -96,51 +106,52 @@ export default function FlyerGallery({
           </label>
           <a className="btn" href="/"><Home size={15} /> Home</a>
           <a className="btn" href="/booklet"><BookOpen size={15} /> Booklet</a>
-          <button type="button" className="btn primary" onClick={onNew}><Plus size={15} /> New flyer</button>
+          <button type="button" className="btn primary" onClick={onNew}><Plus size={15} /> New program flyer</button>
         </div>
       </header>
 
       <main className="fg-main">
         <section>
           <div className="fg-head">
-            <h2>{cloud ? "Team flyers" : "My flyers"}</h2>
-            <p>Point at a flyer and click the pencil to edit it. Changes save automatically.</p>
+            <h2>Program flyers</h2>
+            <p>One master flyer per program. Everyone edits the same flyer, so it is always the latest version. Point at one and click the pencil.</p>
           </div>
           {error && <p className="fg-note">{error}</p>}
           <div className="fg-grid">
-            <button type="button" className="fg-card fg-new" onClick={onNew}>
-              <span className="fg-thumb fg-new-box" style={{ width: THUMB_W, height: FLYER_H * S }}>
-                <Plus size={28} />
-                <b>New flyer</b>
-                <small>Paste course details and the flyer builds itself</small>
-              </span>
-            </button>
-            {saved === null &&
-              Array.from({ length: 3 }, (_, i) => (
-                <div key={i} className="fg-card"><span className="fg-thumb fg-skel" style={{ width: THUMB_W, height: FLYER_H * S }} /></div>
+            {masters === null &&
+              TEMPLATES.map((t) => (
+                <div key={t.id} className="fg-card"><span className="fg-thumb fg-skel" style={{ width: THUMB_W, height: FLYER_H * S }} /></div>
               ))}
+            {masters?.filter((m) => match(m.t.name)).map(({ t, p }) => (
+              <Card key={t.id} project={p} sub={p.updatedBy ? sub(p) : "Master copy"} onOpen={() => onOpenMaster(t)} />
+            ))}
+            {saved === null && Array.from({ length: 1 }, (_, i) => (
+              <div key={`s${i}`} className="fg-card"><span className="fg-thumb fg-skel" style={{ width: THUMB_W, height: FLYER_H * S }} /></div>
+            ))}
             {shown.map((i) => (
               <Card key={i.key} project={i.project} sub={i.sub} onOpen={() => onOpen(i.project, i.etag)} />
             ))}
+            <button type="button" className="fg-card fg-new" onClick={onNew}>
+              <span className="fg-thumb fg-new-box" style={{ width: THUMB_W, height: FLYER_H * S }}>
+                <Plus size={28} />
+                <b>New program flyer</b>
+                <small>For a program that has no flyer yet. Paste the course details and it builds itself.</small>
+              </span>
+            </button>
           </div>
-          {saved && !shown.length && !q && <p className="fg-note">No saved flyers yet. Start from a ready-made design below.</p>}
         </section>
 
-        <section>
-          <div className="fg-head">
-            <h2>Ready-made designs</h2>
-            <p>Opening one makes a new copy, so the original design stays as it is.</p>
-          </div>
-          <div className="fg-grid">
-            {starters.filter((s) => match(s.t.name)).map(({ t, p }) => (
-              <Card key={t.id} project={p} sub="BOSS design" onOpen={() => {
-                const fresh = projectFromTemplate(t);
-                fresh.brand = loadDefaultBrand();
-                onOpen(fresh);
-              }} />
-            ))}
-          </div>
-        </section>
+        {olderCopies.length > 0 && (
+          <details className="fg-older">
+            <summary>Older copies from before ({olderCopies.length})</summary>
+            <p className="fg-note">These were made before each program had one master flyer. The newest one was used to start the master. You can open them to compare, or delete them from Team flyers.</p>
+            <div className="fg-grid">
+              {olderCopies.filter((i) => match(i.project.name)).map((i) => (
+                <Card key={i.key} project={i.project} sub={i.sub} onOpen={() => onOpen(i.project, i.etag)} />
+              ))}
+            </div>
+          </details>
+        )}
       </main>
     </div>
   );

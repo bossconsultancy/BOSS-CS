@@ -342,10 +342,6 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
       }
       root.style.setProperty("--k", kk.toFixed(4));
     }
-    if (!fits() && flowBlocks.length > 1) {
-      setMode({ key: fitKey, flow: true, split: null });
-      return;
-    }
     onFit?.({ k: kk, overflow: Math.max(0, main.scrollHeight - main.clientHeight - 1), heroOverflow, pages: 1 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey, fontsReady, flow, split]);

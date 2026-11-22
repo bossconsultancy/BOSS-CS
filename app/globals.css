@@ -279,3 +279,7 @@ a.brand-mark { color: inherit; text-decoration: none; }
 .fe-card { border-color: #2f6df6 !important; }
 .preview-scale { height: auto; }
 @media print { .flyer-pages { gap: 0 !important; } .flyer-root { break-after: page; } .flyer-root:last-child { break-after: auto; } .preview-box { height: auto !important; } }
+
+.fg-older { border-top: 1px solid var(--line); padding-top: 18px; }
+.fg-older summary { cursor: pointer; font-weight: 600; color: var(--muted); font-size: 14px; }
+.fg-older .fg-grid { margin-top: 14px; opacity: .85; }
