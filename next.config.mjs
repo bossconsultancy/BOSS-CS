@@ -8,6 +8,9 @@ const nextConfig = {
     "/api/refine": ["./public/brand/**"],
     "/api/finish": ["./public/brand/**"],
     "/api/prompt": ["./public/brand/**"],
+    // general flyers start from these designs
+    "/api/general": ["./public/general/*.html"],
+    "/api/general/[id]": ["./public/general/*.html"],
   },
 };
 export default nextConfig;
