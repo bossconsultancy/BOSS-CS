@@ -6,7 +6,7 @@
  */
 
 import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
-import { BookOpen, Home, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, BookOpen, Home, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import Flyer, { FLYER_H, FLYER_W } from "./Flyer";
 import { TEMPLATES, isMasterId, masterId, templateByName, type Template } from "@/lib/samples";
 import { loadMaster } from "@/lib/masters";
@@ -122,9 +122,10 @@ export default function FlyerGallery({
   return (
     <div className="app fg-app">
       <header className="topbar">
-        <a className="brand-mark" href="/" title="Back to home">
+        <a className="back-link" href="/flyers" title="Back"><ArrowLeft size={18} /></a>
+        <a className="brand-mark" href="/flyers">
           <img src="/logo-navy.svg" alt="" />
-          <span>Flyers</span>
+          <span>Education program flyers</span>
         </a>
         <span className={`save-state ${cloud ? "cloud" : "local"}`}>{cloud ? "Team library" : cloud === false ? "Saved on this computer only" : ""}</span>
         <div className="top-actions">

@@ -11,7 +11,7 @@ import './social.css'
 
 // Social posts & department news have their own look (Tailwind), kept separate from the flyer studio.
 export const metadata: Metadata = {
-  title: 'BOSS Studio',
+  title: 'BOSS Designs',
   description: 'Department news and social media posts for BOSS Consultancy Services',
   robots: { index: false, follow: false },
 }

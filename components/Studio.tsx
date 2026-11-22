@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { BookOpen, Check, CloudOff, Redo2, Undo2, Copy, Download, FileDown, FileUp, FolderOpen, ImageDown, Plus, Printer, RefreshCw, Search, Sparkles, Trash2, Upload, Users, X, Home, LayoutGrid } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, CloudOff, Redo2, Undo2, Copy, Download, FileDown, FileUp, FolderOpen, ImageDown, Plus, Printer, RefreshCw, Search, Sparkles, Trash2, Upload, Users, X, Home, LayoutGrid } from "lucide-react";
 import FlyerGallery from "./FlyerGallery";
 import { useFlyerEdit } from "./FlyerEdit";
 import Flyer, { FLYER_H, FLYER_W, PAGE_GAP, type FitInfo, type FlyerHandle } from "./Flyer";
@@ -143,6 +143,24 @@ export default function Studio() {
     const h = setTimeout(() => saveNow(project, { force: true }), 15000);
     return () => clearTimeout(h);
   }, [saveState, project, saveNow]);
+
+  // the browser Back button leaves the editor for the flyer list, like a normal page
+  useEffect(() => {
+    if (view !== "editor") return;
+    if (!history.state?.fe) history.pushState({ ...(history.state || {}), fe: 1 }, "");
+    const on = () => {
+      if (projectRef.current) saveNow(projectRef.current);
+      setView("gallery");
+    };
+    window.addEventListener("popstate", on);
+    return () => window.removeEventListener("popstate", on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+  const goBack = () => {
+    if (project) saveNow(project);
+    if (history.state?.fe) history.back();
+    else setView("gallery");
+  };
 
   // live updates: when you are not typing, pick up a teammate's newer save automatically (like Google Docs)
   const lastEdit = useRef(0);
@@ -407,7 +425,8 @@ export default function Studio() {
   return (
     <div className="app">
       <header className="topbar">
-        <a className="brand-mark" href="/" title="Back to home">
+        <button type="button" className="back-link" title="Back" onClick={goBack}><ArrowLeft size={18} /></button>
+        <a className="brand-mark" href="/flyers/programs" onClick={(e) => { e.preventDefault(); goBack(); }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-navy.svg" alt="BOSS" />
           <span>Flyer Studio</span>
@@ -439,7 +458,7 @@ export default function Studio() {
           <a className="btn" href="/" title="All BOSS tools">
             <Home size={15} /> Home
           </a>
-          <button type="button" className="btn" onClick={() => { saveNow(project); setView("gallery"); }} title="See all flyers">
+          <button type="button" className="btn" onClick={goBack} title="See all flyers">
             <LayoutGrid size={15} /> All flyers
           </button>
           <a className="btn" href="/booklet" title="The company profile booklet">

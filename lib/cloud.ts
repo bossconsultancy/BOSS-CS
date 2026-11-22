@@ -226,17 +226,17 @@ export class BookletConflictError extends Error {
 }
 
 /** Saves the edited booklet. `etag` guards against overwriting someone else's newer save. */
-export async function saveCloudBooklet(html: string, etag: string | null, lang: BookletLang = "ta"): Promise<{ etag: string }> {
+export async function saveCloudBooklet(html: string, etag: string | null, lang: BookletLang = "ta", overwrite = false): Promise<{ etag: string }> {
   const BOOKLET_PATH = bookletPath(lang);
   try {
     const res = MOCK
-      ? await (await mockFs()).write(BOOKLET_PATH, html, etag ? { ifMatch: etag } : { allowOverwrite: false })
+      ? await (await mockFs()).write(BOOKLET_PATH, html, overwrite ? { allowOverwrite: true } : etag ? { ifMatch: etag } : { allowOverwrite: false })
       : await put(BOOKLET_PATH, html, {
           access: "private",
           contentType: "text/html; charset=utf-8",
           addRandomSuffix: false,
           cacheControlMaxAge: 60,
-          ...(etag ? { ifMatch: etag } : { allowOverwrite: false }),
+          ...(overwrite ? { allowOverwrite: true } : etag ? { ifMatch: etag } : { allowOverwrite: false }),
         });
     return { etag: res.etag };
   } catch (e) {
@@ -260,4 +260,57 @@ export async function resetCloudBooklet(lang: BookletLang = "ta"): Promise<void>
 /** Stores a photo placed into the booklet and returns its app URL. */
 export async function storeBookletPhoto(dataUrl: string): Promise<string> {
   return storePhoto("booklet", dataUrl);
+}
+
+/* ---- General flyers (notices, announcements…): one editable page each, latest save wins ---- */
+
+export interface GeneralDoc {
+  id: string;
+  name: string;
+  html: string;
+  updatedAt: number;
+  updatedBy?: string;
+}
+const generalPath = (id: string) => `general/${id}.json`;
+
+export async function listGeneral(): Promise<GeneralDoc[]> {
+  const paths: string[] = [];
+  if (MOCK) paths.push(...(await (await mockFs()).list("general/")).map((b) => b.pathname));
+  else {
+    let cursor: string | undefined;
+    do {
+      const page = await list({ prefix: "general/", limit: 1000, cursor });
+      paths.push(...page.blobs.map((b) => b.pathname));
+      cursor = page.hasMore ? page.cursor : undefined;
+    } while (cursor);
+  }
+  const out: GeneralDoc[] = [];
+  await Promise.all(paths.filter((p) => p.endsWith(".json")).map(async (p) => {
+    const r = await readText(p).catch(() => null);
+    if (r) try { out.push(JSON.parse(r.text)); } catch { /* skip */ }
+  }));
+  return out.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function loadGeneral(id: string): Promise<{ doc: GeneralDoc; etag: string } | null> {
+  const r = await readText(generalPath(id));
+  return r ? { doc: JSON.parse(r.text) as GeneralDoc, etag: r.etag } : null;
+}
+
+export async function saveGeneral(doc: GeneralDoc): Promise<{ etag: string }> {
+  const body = JSON.stringify(doc);
+  const res = MOCK
+    ? await (await mockFs()).write(generalPath(doc.id), body, { allowOverwrite: true })
+    : await put(generalPath(doc.id), body, { access: "private", contentType: "application/json", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60 });
+  return { etag: res.etag };
+}
+
+export async function trashGeneral(id: string): Promise<void> {
+  const to = `trash/general-${id}-${Date.now()}.json`;
+  if (MOCK) return (await mockFs()).rename(generalPath(id), to);
+  await rename(generalPath(id), to, { access: "private" });
+}
+
+export async function storeGeneralPhoto(dataUrl: string): Promise<string> {
+  return storePhoto("general", dataUrl);
 }

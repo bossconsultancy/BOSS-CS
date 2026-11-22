@@ -1,6 +1,6 @@
 import { ArrowRight, BookOpen, FileText, Megaphone, Newspaper } from "lucide-react";
 
-export const metadata = { title: "BOSS Studio", description: "BOSS Consultancy Services design tools" };
+export const metadata = { title: "BOSS Designs", description: "BOSS Consultancy Services design tools" };
 
 const TILES = [
   {
@@ -48,16 +48,12 @@ export default function Home() {
               <t.icon size={44} strokeWidth={1.7} />
             </span>
             <h2>{t.title}</h2>
-            <span className="tile-go">
-              Open <ArrowRight size={16} />
+            <span className="tile-go" aria-hidden>
+              <ArrowRight size={22} strokeWidth={2.2} />
             </span>
           </a>
         ))}
       </nav>
-      <footer className="home-foot">
-        <a href="tel:+14166050101">416 605 0101</a>
-        <a href="https://bosscs.com" target="_blank" rel="noreferrer">bosscs.com</a>
-      </footer>
     </div>
   );
 }

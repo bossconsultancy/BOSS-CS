@@ -22,7 +22,7 @@ export async function GET(req: Request) {
 
 export async function PUT(req: Request) {
   if (!cloudEnabled()) return off();
-  let body: { html?: string; etag?: string | null };
+  let body: { html?: string; etag?: string | null; latest?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -31,7 +31,7 @@ export async function PUT(req: Request) {
   const html = body.html || "";
   if (!html.includes('class="sheet"')) return NextResponse.json({ error: "This is not a valid booklet." }, { status: 400 });
   try {
-    return NextResponse.json(await saveCloudBooklet(html, body.etag || null, langOf(req)));
+    return NextResponse.json(await saveCloudBooklet(html, body.etag || null, langOf(req), body.latest === true));
   } catch (e) {
     if (e instanceof BookletConflictError) return NextResponse.json({ conflict: true }, { status: 409 });
     return NextResponse.json({ error: `Could not save the booklet: ${e instanceof Error ? e.message : "unknown error"}` }, { status: 502 });

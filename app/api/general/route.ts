@@ -1,0 +1,35 @@
+import { NextResponse } from "next/server";
+import { promises as fs } from "fs";
+import path from "path";
+import { cloudEnabled, listGeneral, saveGeneral } from "@/lib/cloud";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const TEMPLATES: Record<string, string> = { notice: "notice.html", blank: "blank.html" };
+
+/** All general flyers (name, time, who), newest first. */
+export async function GET() {
+  if (!cloudEnabled()) return NextResponse.json({ error: "The team library is not set up yet." }, { status: 501 });
+  let docs = await listGeneral();
+  if (!docs.length) {
+    // first visit: start the library with the notice to clients and visitors
+    const html = await fs.readFile(path.join(/* turbopackIgnore: true */ process.cwd(), "public", "general", "notice.html"), "utf8");
+    const doc = { id: `g${Date.now().toString(36)}notice`, name: "Notice to all clients and visitors", html, updatedAt: Date.now(), updatedBy: "" };
+    await saveGeneral(doc);
+    docs = [doc];
+  }
+  return NextResponse.json({ flyers: docs.map(({ id, name, updatedAt, updatedBy, html }) => ({ id, name, updatedAt, updatedBy, html })) });
+}
+
+/** New general flyer from a starting design: { template, name, by } → { id } */
+export async function POST(req: Request) {
+  if (!cloudEnabled()) return NextResponse.json({ error: "The team library is not set up yet." }, { status: 501 });
+  const body = (await req.json().catch(() => ({}))) as { template?: string; name?: string; by?: string };
+  const file = TEMPLATES[body.template || "blank"] || TEMPLATES.blank;
+  const html = await fs.readFile(path.join(/* turbopackIgnore: true */ process.cwd(), "public", "general", file), "utf8");
+  const id = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const name = (body.name || "").trim().slice(0, 80) || "New flyer";
+  await saveGeneral({ id, name, html, updatedAt: Date.now(), updatedBy: body.by || "" });
+  return NextResponse.json({ id });
+}

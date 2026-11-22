@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { get, set, del } from "idb-keyval";
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Copy, FileDown, Image as ImageIcon, ImageDown,
-  Home, Italic, Minus, Pencil, Plus, Printer, Redo2, RefreshCw, RotateCcw, Save, Sparkles, Trash2, Type, Undo2, ZoomIn, ZoomOut,
+  ArrowLeft, Home, Italic, LayoutGrid, Minus, Pencil, Plus, Printer, Redo2, RefreshCw, RotateCcw, Save, Sparkles, Trash2, Type, Undo2, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { elementToTyped, isBamini, typedToBookletHtml } from "@/lib/bamini";
 
@@ -20,12 +20,13 @@ const KEYS: Record<Lang, string> = { ta: "boss-booklet-v2", en: "boss-booklet-en
 const SRCS: Record<Lang, string> = { ta: "/booklet/pages.html", en: "/booklet/pages-en.html" };
 const NAMES: Record<Lang, string> = { ta: "Tamil", en: "English" };
 const CSS = "/booklet/booklet.css";
-const PAGE_W = 840;
-const PAGE_H = 1080;
-
 type Snap = { page: number; html: string };
 
-export default function Booklet() {
+/** Without `doc` this is the company profile booklet; with `doc` it edits one general flyer (one US Letter page). */
+export default function Booklet({ doc }: { doc?: { id: string; title: string } } = {}) {
+  const PAGE_W = doc ? 816 : 840;
+  const PAGE_H = doc ? 1056 : 1080;
+  const docName = doc ? doc.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "BOSS-flyer" : "";
   const stage = useRef<HTMLDivElement>(null);
   const past = useRef<Snap[]>([]);
   const future = useRef<Snap[]>([]);
@@ -51,9 +52,9 @@ export default function Booklet() {
   const [editing, setEditing] = useState<HTMLElement | null>(null);
   const [, tick] = useState(0);
   const dragRef = useRef<{ box: HTMLElement; x: number; y: number; left: number; top: number; moved: boolean } | null>(null);
-  const KEY = KEYS[lang];
-  const SRC = SRCS[lang];
-  const docUrl = `/api/booklet-doc?lang=${lang}`;
+  const KEY = doc ? `boss-general-${doc.id}` : KEYS[lang];
+  const SRC = doc ? "" : SRCS[lang];
+  const docUrl = doc ? `/api/general/${doc.id}` : `/api/booklet-doc?lang=${lang}`;
   useEffect(() => {
     try { const l = localStorage.getItem("boss-booklet-lang"); if (l === "en" || l === "ta") setLangState(l); } catch { /* private window */ }
   }, []);
@@ -90,7 +91,7 @@ export default function Booklet() {
         // offline: fall back to this browser
       }
       if (!saved) saved = (await get(KEY).catch(() => null)) as string | null;
-      const html: string = saved || (await fetch(SRC).then((r) => r.text() as Promise<string>));
+      const html: string = saved || (SRC ? await fetch(SRC).then((r) => r.text() as Promise<string>) : "");
       if (dead || !stage.current) return;
       stage.current.innerHTML = html;
       setCount(stage.current.querySelectorAll("section.sheet").length);
@@ -110,10 +111,9 @@ export default function Booklet() {
       await set(KEY, html).catch(() => null);
       if (cloud.current) {
         try {
-          const res = await fetch(docUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ html, etag: etag.current }) });
+          const res = await fetch(docUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ html, etag: etag.current, latest: true }) });
           const data = await res.json().catch(() => ({}));
-          if (res.status === 409) setCloudNote("Someone else saved a newer version of the booklet. Reload the page to see it. Your change is kept on this computer.");
-          else if (!res.ok) setCloudNote(data.error || "Could not save to the team library. Your change is kept on this computer.");
+          if (!res.ok) setCloudNote(data.error || "Could not save to the team library. Your change is kept on this computer.");
           else {
             etag.current = data.etag || null;
             setCloudNote("");
@@ -552,12 +552,12 @@ export default function Booklet() {
       const css = await fetch(CSS).then((r) => r.text());
       const body = await assetsToData(stage.current.innerHTML);
       const style = await assetsToData(css);
-      const doc = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">`
-        + `<title>BOSS CS Company Profile (${NAMES[lang]})</title><style>${style}`
-        + `@page{size:840px 1080px;margin:0}html,body{margin:0}`
-        + `.sheet{width:840px;height:1080px;overflow:hidden;break-after:page}`
+      const html = `<!doctype html><html lang="${doc ? "en" : lang}"><head><meta charset="utf-8">`
+        + `<title>${doc ? doc.title : `BOSS CS Company Profile (${NAMES[lang]})`}</title><style>${style}`
+        + `@page{size:${PAGE_W}px ${PAGE_H}px;margin:0}html,body{margin:0}`
+        + `.sheet{width:${PAGE_W}px;height:${PAGE_H}px;overflow:hidden;break-after:page}`
         + `.sheet:last-child{break-after:auto}</style></head><body>${body}</body></html>`;
-      saveBlob(new Blob([doc], { type: "text/html" }), `BOSS-CS-Company-Profile-${NAMES[lang]}.html`);
+      saveBlob(new Blob([html], { type: "text/html" }), doc ? `${docName}.html` : `BOSS-CS-Company-Profile-${NAMES[lang]}.html`);
     } finally {
       setBusy("");
     }
@@ -571,7 +571,7 @@ export default function Booklet() {
       const url = await toPng(sheet, { width: PAGE_W, height: PAGE_H, pixelRatio: 3.125, cacheBust: true });
       const a = document.createElement("a");
       a.href = url;
-      a.download = `BOSS-booklet-${lang}-page-${String(currentPage()).padStart(2, "0")}.png`;
+      a.download = doc ? `${docName}.png` : `BOSS-booklet-${lang}-page-${String(currentPage()).padStart(2, "0")}.png`;
       a.click();
     } finally {
       setBusy("");
@@ -589,7 +589,7 @@ export default function Booklet() {
         if (i) pdf.addPage([PAGE_W, PAGE_H], "portrait");
         pdf.addImage(url, "JPEG", 0, 0, PAGE_W, PAGE_H);
       }
-      pdf.save(`BOSS-CS-Company-Profile-${NAMES[lang]}.pdf`);
+      pdf.save(doc ? `${docName}.pdf` : `BOSS-CS-Company-Profile-${NAMES[lang]}.pdf`);
     } finally {
       setBusy("");
     }
@@ -627,20 +627,25 @@ export default function Booklet() {
     <div className="app bk-app">
       <link rel="stylesheet" href={CSS} />
       <header className="topbar">
-        <a className="brand-mark" href="/" title="Back to home">
+        <a className="back-link" href={doc ? "/flyers/general" : "/"} title="Back"><ArrowLeft size={18} /></a>
+        <a className="brand-mark" href={doc ? "/flyers/general" : "/"}>
           <img src="/logo-navy.svg" alt="" />
-          <span>Company profile booklet</span>
+          <span>{doc ? doc.title : "Company profile booklet"}</span>
         </a>
         <span className={`save-state ${cloud.current ? "cloud" : "local"}`} title={cloudNote || undefined}>
-          {cloudNote ? "Not saved to team library" : saveState === "saving" ? "Saving…" : edited ? (cloud.current ? "Saved to team library" : "Saved in this browser") : "Original booklet"}
+          {cloudNote ? "Not saved to team library" : saveState === "saving" ? "Saving…" : edited ? (cloud.current ? "Saved to team library" : "Saved in this browser") : doc ? "" : "Original booklet"}
         </span>
         {cloudNote ? <span className="save-state local" style={{ maxWidth: 360, whiteSpace: "normal" }}>{cloudNote}</span> : null}
         <div className="top-actions">
           <a className="btn" href="/" title="All BOSS tools"><Home size={15} /> Home</a>
-          <div className="bk-lang" role="group" aria-label="Booklet language">
-            <button type="button" className={lang === "ta" ? "on" : ""} onClick={() => setLang("ta")}>தமிழ்</button>
-            <button type="button" className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>English</button>
-          </div>
+          {doc ? (
+            <a className="btn" href="/flyers/general"><LayoutGrid size={15} /> All general flyers</a>
+          ) : (
+            <div className="bk-lang" role="group" aria-label="Booklet language">
+              <button type="button" className={lang === "ta" ? "on" : ""} onClick={() => setLang("ta")}>தமிழ்</button>
+              <button type="button" className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>English</button>
+            </div>
+          )}
           <div className="undo-group">
             <button type="button" className="btn icon-only" title="Undo (Cmd/Ctrl + Z)"
               disabled={!past.current.length} onClick={() => step(past.current, future.current)}>
@@ -761,7 +766,7 @@ export default function Booklet() {
                     <button key={i} type="button" className="btn bk-page-btn" onClick={() => goto(i + 1)}>{i + 1}</button>
                   ))}
                 </div>
-                <button type="button" className="btn" onClick={reset}><RotateCcw size={14} /> Back to the original</button>
+                {!doc && <button type="button" className="btn" onClick={reset}><RotateCcw size={14} /> Back to the original</button>}
               </div>
             </div>
           </div>

@@ -10,7 +10,7 @@ import "@fontsource/dm-sans/600.css";
 import "../globals.css";
 
 export const metadata: Metadata = {
-  title: "BOSS Flyer Studio",
+  title: "BOSS Designs",
   description: "Make BOSS program flyers from course information.",
   robots: { index: false, follow: false },
 };
