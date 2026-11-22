@@ -142,7 +142,6 @@ export default function FlyerGallery({
         <section>
           <div className="fg-head">
             <h2>Program flyers</h2>
-            <p>One master flyer per program. Everyone edits the same flyer, so it is always the latest version. Point at one and click the pencil.</p>
           </div>
           {error && <p className="fg-note">{error}</p>}
           <div className="fg-grid">
@@ -163,7 +162,6 @@ export default function FlyerGallery({
               <span className="fg-thumb fg-new-box" style={{ width: THUMB_W, height: FLYER_H * S }}>
                 <Plus size={28} />
                 <b>New program flyer</b>
-                <small>For a program that has no flyer yet. Paste the course details and it builds itself.</small>
               </span>
             </button>
           </div>
@@ -172,7 +170,6 @@ export default function FlyerGallery({
         {olderCopies.length > 0 && (
           <details className="fg-older" open>
             <summary>Duplicate copies ({olderCopies.length})</summary>
-            <p className="fg-note">Extra copies of a program flyer. The program flyer above is the newest one, so these older copies can be deleted once it looks right.</p>
             <button type="button" className={`btn ${confirm === "all" ? "danger" : ""}`} disabled={busy}
               onClick={() => (confirm === "all" ? remove(olderCopies.map((i) => i.project.id)) : setConfirm("all"))}>
               <Trash2 size={15} /> {confirm === "all" ? `Click again to delete all ${olderCopies.length} duplicates` : "Delete all duplicates"}

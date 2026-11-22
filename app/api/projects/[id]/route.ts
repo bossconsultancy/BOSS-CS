@@ -27,7 +27,7 @@ export async function PUT(req: Request, { params }: Ctx) {
   const { id } = await params;
   const bad = guard(id);
   if (bad) return bad;
-  let body: { project?: Project; etag?: string | null };
+  let body: { project?: Project; etag?: string | null; latest?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -38,7 +38,8 @@ export async function PUT(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "This is not a valid flyer." }, { status: 400 });
   }
   try {
-    const saved = await saveCloudProject(project, body.etag || null);
+    // latest: always keep the newest save (like Google Docs), no conflict questions
+    const saved = await saveCloudProject(project, body.etag || null, body.latest === true);
     return NextResponse.json(saved);
   } catch (e) {
     if (e instanceof ConflictError) return NextResponse.json({ conflict: true, current: e.current }, { status: 409 });

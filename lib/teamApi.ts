@@ -50,12 +50,12 @@ export async function teamLoad(id: string): Promise<{ project: Project; etag: st
   return data;
 }
 
-export async function teamSave(project: Project, etag: string | null): Promise<SaveResult> {
+export async function teamSave(project: Project, etag: string | null, latest = false): Promise<SaveResult> {
   try {
     const res = await fetch(`/api/projects/${project.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project, etag }),
+      body: JSON.stringify({ project, etag, latest }),
     });
     const data = await json(res);
     if (res.status === 409) return { ok: false, conflict: true, current: data.current || null };

@@ -680,9 +680,6 @@ export default function Booklet() {
           <div className="panel-scroll">
             <div className="card open">
               <div className="card-body">
-                <p className="bk-hint">
-                  Point at anything to see the pencil. Click to select it, drag to move it, pull the corners to resize, and double-click text to type. Delete removes it, arrows nudge it (Shift moves 10px), Esc lets go. Nothing here uses AI, so editing is free.
-                </p>
                 <div className="bk-row">
                   <button type="button" className="btn" onClick={addText}><Type size={14} /> Add text</button>
                   <button type="button" className="btn" onClick={duplicate} disabled={!sel}><Copy size={14} /> Copy</button>
@@ -695,8 +692,7 @@ export default function Booklet() {
               <div className="card open">
                 <div className="card-head"><div className="card-toggle">Ask for a change</div></div>
                 <div className="card-body">
-                  <p className="bk-hint">Say what you want in your own words: &quot;make this heading shorter&quot;, &quot;say it in simpler Tamil&quot;, &quot;make the text navy and a bit bigger&quot;. This one uses the site&apos;s OpenAI credit.</p>
-                  <textarea className="input" rows={3} value={ask} placeholder="What should change here?"
+                  <textarea className="input" rows={3} value={ask} placeholder="e.g. make this shorter"
                     onChange={(e) => setAsk(e.target.value)} />
                   <button type="button" className="btn primary" disabled={busy === "ai" || !ask.trim()} onClick={askAi}>
                     {busy === "ai" ? <RefreshCw size={14} className="spin" /> : <Sparkles size={14} />} Make the change

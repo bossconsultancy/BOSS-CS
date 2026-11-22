@@ -1,12 +1,13 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { forwardRef, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Award, BookOpen, Briefcase, CalendarCheck, CalendarDays, Check, ClipboardCheck, Clock, Globe, GraduationCap, HandCoins,
   Hourglass, Image as ImageIcon, MapPin, Monitor, Phone, ShieldCheck, SunMoon, TrendingUp, Users, Wallet, type LucideIcon,
 } from "lucide-react";
 import { buildTheme, type Theme } from "@/lib/colors";
 import { cleanText } from "@/lib/text";
+import { overrideCss } from "@/lib/flyerEls";
 import type { Brand, Design, Fact, FlyerContent, IconName } from "@/lib/types";
 
 export const FLYER_W = 840;
@@ -89,17 +90,17 @@ function Chips({ items, t, cols = 2, field }: { items: string[]; t: Theme; cols?
   );
 }
 
-function Section({ children, gap = 11 }: { children: ReactNode; gap?: number }) {
-  return <section style={{ display: "flex", flexDirection: "column", gap: k(gap) }}>{children}</section>;
+function Section({ children, gap = 11, el }: { children: ReactNode; gap?: number; el?: string }) {
+  return <section data-el={el} style={{ display: "flex", flexDirection: "column", gap: k(gap) }}>{children}</section>;
 }
 
-function Panel({ children, t }: { children: ReactNode; t: Theme }) {
-  return <div style={{ background: t.light, borderRadius: 12, padding: `${k(14)} 16px`, display: "flex", flexDirection: "column", gap: k(10) }}>{children}</div>;
+function Panel({ children, t, el }: { children: ReactNode; t: Theme; el?: string }) {
+  return <div data-el={el} style={{ background: t.light, borderRadius: 12, padding: `${k(14)} 16px`, display: "flex", flexDirection: "column", gap: k(10) }}>{children}</div>;
 }
 
 function Callout({ text, t }: { text: string; t: Theme }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, background: t.light, border: `1px solid ${t.rule}`, borderRadius: 12, padding: `${k(12)} 16px` }}>
+    <div data-el="callout" style={{ display: "flex", alignItems: "center", gap: 14, background: t.light, border: `1px solid ${t.rule}`, borderRadius: 12, padding: `${k(12)} 16px` }}>
       <Tile Icon={HandCoins} t={t} size={36} glyph={19} radius={10} />
       <p data-field="financialNote" data-group="callout" style={{ margin: 0, fontFamily: PO, fontWeight: 600, fontSize: kv("callout", 14.5), lineHeight: 1.35, color: t.ink }}>{text}</p>
     </div>
@@ -154,6 +155,9 @@ interface Props {
 
 const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, design, brand, onFit }, ref) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const fid = "f" + useId().replace(/[^a-z0-9]/gi, "");
+  const visRef = useRef<HTMLStyleElement>(null);
+  const ovCss = overrideCss(fid, design.overrides);
   const root2Ref = useRef<HTMLDivElement>(null);
   const main2Ref = useRef<HTMLElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -187,31 +191,31 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
   const learnCols = design.learnCols || (wide ? (avgLen(learn) > 46 ? 2 : 3) : learn.length > 9 ? 2 : 1);
 
   const learnBlock = (cols: number) => (
-    <Section key="learn">
+    <Section key="learn" el="sec-learn">
       <Head Icon={BookOpen} title={titles.learn} t={t} field="titles.learn" />
       <Checklist items={learn} t={t} cols={cols} fs={wide && cols >= 3 ? 12.5 : 13} field="learn" />
     </Section>
   );
   const careersBlock = (cols: number) => (
-    <Section key="careers">
+    <Section key="careers" el="sec-careers">
       <Head Icon={Briefcase} title={titles.careers} t={t} field="titles.careers" />
       <Chips items={careers} t={t} cols={cols} field="careers" />
     </Section>
   );
   const admissionBlock = (cols: number) => (
-    <Section key="admission">
+    <Section key="admission" el="sec-admission">
       <Head Icon={ClipboardCheck} title={titles.admission} t={t} field="titles.admission" />
       <Checklist items={admission} t={t} cols={cols} fs={12.5} field="admission" />
     </Section>
   );
   const highlightsBlock = (cols: number) => (
-    <Panel key="highlights" t={t}>
+    <Panel key="highlights" t={t} el="sec-highlights">
       <PanelHead Icon={Award} title={titles.highlights} t={t} field="titles.highlights" />
       <Checklist items={highlights} t={t} cols={cols} fs={12.5} field="highlights" />
     </Panel>
   );
   const salaryBlock = (
-    <Panel key="salary" t={t}>
+    <Panel key="salary" t={t} el="sec-salary">
       <PanelHead Icon={TrendingUp} title={titles.salary} t={t} field="titles.salary" />
       {salary.map((r, i) => (
         <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2, borderTop: i ? `1px solid ${t.rule}` : "none", paddingTop: i ? k(8) : 0 }}>
@@ -279,7 +283,7 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
   const companyTag = (brand.companyTagline || "").split("\n");
 
   const hero = design.headerHeight || 350;
-  const fitKey = JSON.stringify([c, design.hidden, design.layout, design.learnCols, design.textSize, hero, brand, design.fontScales]);
+  const fitKey = JSON.stringify([c, design.hidden, design.layout, design.learnCols, design.textSize, hero, brand, design.fontScales, ovCss.layout]);
   const [mode, setMode] = useState<{ key: string; flow: boolean; split: number | null }>({ key: "", flow: false, split: null });
   const flow = mode.key === fitKey && mode.flow;
   const split = mode.key === fitKey ? mode.split : null;
@@ -289,6 +293,10 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
     const main = mainRef.current;
     const band = bandRef.current;
     if (!root || !main || !band) return;
+    // manual moves/colours must not change the automatic fit: switch them off while measuring
+    const vis = visRef.current?.sheet;
+    if (vis) vis.disabled = true;
+    try {
     // header: shrink the title if it does not fit the band
     let h = 1;
     band.style.setProperty("--h", "1");
@@ -343,6 +351,9 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
       root.style.setProperty("--k", kk.toFixed(4));
     }
     onFit?.({ k: kk, overflow: Math.max(0, main.scrollHeight - main.clientHeight - 1), heroOverflow, pages: 1 });
+    } finally {
+      if (vis) vis.disabled = false;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey, fontsReady, flow, split]);
 
@@ -362,12 +373,14 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
 
   return (
     <div className="flyer-pages" style={{ display: "flex", flexDirection: "column", gap: PAGE_GAP }}>
-    <div ref={rootRef} className="flyer-root" style={rootStyle}>
+    <div ref={rootRef} className="flyer-root" data-fid={fid} style={rootStyle}>
+      <style>{ovCss.layout}</style>
+      <style ref={visRef}>{ovCss.visual}</style>
       <header style={{ height: hero, display: "flex", flexShrink: 0 }}>
-        <div ref={bandRef} style={{ width: 470, background: t.band, boxSizing: "border-box", padding: `52px 28px 54px ${MX}px`, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 12, overflow: "hidden" }}>
+        <div ref={bandRef} data-el="band" style={{ width: 470, background: t.band, boxSizing: "border-box", padding: `52px 28px 54px ${MX}px`, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 12, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={t.logo === "white" ? "/logo-white.svg" : "/logo-navy.svg"} alt="BOSS Consultancy Services Ltd." style={{ height: 46, width: "auto", display: "block", marginLeft: -6 }} />
+            <img data-el="logo" src={t.logo === "white" ? "/logo-white.svg" : "/logo-navy.svg"} alt="BOSS Consultancy Services Ltd." style={{ height: 46, width: "auto", display: "block", marginLeft: -6 }} />
             {companyTag.some(Boolean) ? (
               <>
                 <div style={{ width: 1, height: 36, background: t.bandText, opacity: 0.45 }} />
@@ -379,7 +392,7 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
             {c.eyebrow ? (
               <span data-field="eyebrow" data-group="tagline" style={{ fontFamily: PO, fontWeight: 600, fontSize: hv("tagline", 12), letterSpacing: "0.16em", textTransform: "uppercase", color: t.eyebrow }}>{cleanText(c.eyebrow)}</span>
             ) : null}
-            <h1 style={{ margin: 0, display: "flex", flexDirection: "column", color: t.bandText }}>
+            <h1 data-el="title" style={{ margin: 0, display: "flex", flexDirection: "column", color: t.bandText }}>
               {titleLines.map((line, i) => (
                 <span key={i} data-field="titleLine" data-i={i} data-group="title" style={{ fontFamily: PO, fontWeight: c.bigCode ? 600 : 700, fontSize: hv("title", titleSize), lineHeight: 1.1 }}>{line}</span>
               ))}
@@ -398,7 +411,7 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
             ) : null}
           </div>
         </div>
-        <div data-field="photo" style={{ flex: 1, minWidth: 0, overflow: "hidden", position: "relative" }}>
+        <div data-field="photo" data-el="photo" style={{ flex: 1, minWidth: 0, overflow: "hidden", position: "relative" }}>
           {photo.src ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -417,7 +430,7 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
       </header>
 
       {facts.length ? (
-        <div style={{ margin: `-34px ${MX}px 0`, background: "#FFFFFF", border: `1px solid ${t.rule}`, borderRadius: 12, boxShadow: "0 6px 18px rgba(20, 30, 40, 0.08)", display: "grid", gridTemplateColumns: facts.map((f) => factColumn(f, design.fontScales?.facts ?? 1)).join(" "), position: "relative" }}>
+        <div data-el="facts" style={{ margin: `-34px ${MX}px 0`, background: "#FFFFFF", border: `1px solid ${t.rule}`, borderRadius: 12, boxShadow: "0 6px 18px rgba(20, 30, 40, 0.08)", display: "grid", gridTemplateColumns: facts.map((f) => factColumn(f, design.fontScales?.facts ?? 1)).join(" "), position: "relative" }}>
           {facts.map((f, i) => (
             <FactCell key={i} i={i} f={{ ...f, label: cleanText(f.label), value: cleanText(f.value), note: cleanText(f.note) }} t={t} first={i === 0} />
           ))}
@@ -428,7 +441,7 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
         {flow ? (split === null ? flowBlocks : flowBlocks.slice(0, split)) : rows}
       </main>
 
-      <footer style={{ height: 60, flexShrink: 0, background: t.footer, boxSizing: "border-box", padding: `0 ${MX}px 12px`, display: "flex", alignItems: "center", justifyContent: footerItems.length > 1 ? "space-between" : "center" }}>
+      <footer data-el="footer" style={{ height: 60, flexShrink: 0, background: t.footer, boxSizing: "border-box", padding: `0 ${MX}px 12px`, display: "flex", alignItems: "center", justifyContent: footerItems.length > 1 ? "space-between" : "center" }}>
         {footerItems.flatMap(({ Icon, node }, i) => [
           i > 0 ? <div key={`d${i}`} style={{ width: 1, height: 24, background: t.footerDivider }} /> : null,
           <div key={`f${i}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -451,7 +464,7 @@ const Flyer = forwardRef<FlyerHandle, Props>(function Flyer({ content: raw, desi
         <main ref={main2Ref} style={{ flex: 1, minHeight: 0, boxSizing: "border-box", padding: `28px ${MX}px 24px`, display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: k(22), overflow: "hidden" }}>
           {flowBlocks.slice(split)}
         </main>
-      <footer style={{ height: 60, flexShrink: 0, background: t.footer, boxSizing: "border-box", padding: `0 ${MX}px 12px`, display: "flex", alignItems: "center", justifyContent: footerItems.length > 1 ? "space-between" : "center" }}>
+      <footer data-el="footer" style={{ height: 60, flexShrink: 0, background: t.footer, boxSizing: "border-box", padding: `0 ${MX}px 12px`, display: "flex", alignItems: "center", justifyContent: footerItems.length > 1 ? "space-between" : "center" }}>
         {footerItems.flatMap(({ Icon, node }, i) => [
           i > 0 ? <div key={`d${i}`} style={{ width: 1, height: 24, background: t.footerDivider }} /> : null,
           <div key={`f${i}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>

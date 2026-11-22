@@ -89,6 +89,23 @@ export interface Design {
   hidden: Partial<Record<SectionKey, boolean>>;
   /** Size multipliers per text group (1 = normal). Missing = 1. */
   fontScales?: Partial<Record<FontKey, number>>;
+  /** Manual changes made on the flyer (moved, resized, recoloured…), keyed by element. */
+  overrides?: Record<string, ElOverride>;
+}
+
+/** A manual change to one piece of the flyer, on top of the automatic layout. */
+export interface ElOverride {
+  x?: number; // moved, px
+  y?: number;
+  s?: number; // scaled (1 = normal)
+  w?: number; // text box width, px
+  fpx?: number; // font size, px
+  color?: string;
+  bg?: string;
+  b?: boolean; // bold
+  it?: boolean; // italic
+  al?: "left" | "center" | "right";
+  hide?: boolean;
 }
 
 export interface Brand {

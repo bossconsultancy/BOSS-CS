@@ -166,7 +166,7 @@ export class ConflictError extends Error {
   }
 }
 
-export async function saveCloudProject(project: Project, etag: string | null): Promise<{ project: Project; etag: string }> {
+export async function saveCloudProject(project: Project, etag: string | null, overwrite = false): Promise<{ project: Project; etag: string }> {
   const p: Project = JSON.parse(JSON.stringify(project));
   let newPhoto = false;
   if (p.design?.photo?.src?.startsWith("data:")) {
@@ -176,13 +176,13 @@ export async function saveCloudProject(project: Project, etag: string | null): P
   const body = JSON.stringify(p);
   try {
     const res = MOCK
-      ? await (await mockFs()).write(projectPath(p.id), body, etag ? { ifMatch: etag } : { allowOverwrite: false })
+      ? await (await mockFs()).write(projectPath(p.id), body, overwrite ? { allowOverwrite: true } : etag ? { ifMatch: etag } : { allowOverwrite: false })
       : await put(projectPath(p.id), body, {
       access: "private",
       contentType: "application/json",
       addRandomSuffix: false,
       cacheControlMaxAge: 60,
-      ...(etag ? { ifMatch: etag } : { allowOverwrite: false }),
+      ...(overwrite ? { allowOverwrite: true } : etag ? { ifMatch: etag } : { allowOverwrite: false }),
     });
     if (newPhoto) cleanupPhotos(p.id, p.design.photo.src);
     return { project: p, etag: res.etag };

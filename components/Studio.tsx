@@ -103,7 +103,7 @@ export default function Studio() {
       const name = getUserName();
       const payload: Project = { ...p, updatedBy: name || p.updatedBy, createdBy: p.createdBy || name };
       const etag = opts.etag !== undefined ? opts.etag : etags.current.get(p.id) || null;
-      const r = await teamSave(payload, etag);
+      const r = await teamSave(payload, etag, true);
       if (seq !== saveSeq.current && r.ok) {
         etags.current.set(p.id, r.etag);
         return;
@@ -122,12 +122,9 @@ export default function Studio() {
           lastSaved.current = JSON.stringify(next);
           return next;
         });
-      } else if (r.conflict) {
-        setSaveState("conflict");
-        setConflict(r.current);
       } else {
         setSaveState("error");
-        setSaveError(r.error);
+        setSaveError(r.conflict ? "Could not save yet. Trying again…" : r.error);
       }
     },
     [cloud],
@@ -146,6 +143,31 @@ export default function Studio() {
     const h = setTimeout(() => saveNow(project, { force: true }), 15000);
     return () => clearTimeout(h);
   }, [saveState, project, saveNow]);
+
+  // live updates: when you are not typing, pick up a teammate's newer save automatically (like Google Docs)
+  const lastEdit = useRef(0);
+  useEffect(() => {
+    if (!cloud || view !== "editor" || !project) return;
+    const id = project.id;
+    const h = setInterval(async () => {
+      const cur = projectRef.current;
+      if (!cur || cur.id !== id) return;
+      if (Date.now() - lastEdit.current < 5000) return;
+      if (JSON.stringify(cur) !== lastSaved.current) return;
+      if (document.querySelector('[contenteditable="true"]')) return;
+      const r = await teamLoad(id).catch(() => null);
+      if (!r || r.etag === etags.current.get(id)) return;
+      if ((r.project.updatedAt || 0) <= (cur.updatedAt || 0)) { etags.current.set(id, r.etag); return; }
+      const now = projectRef.current;
+      if (!now || now.id !== id || JSON.stringify(now) !== lastSaved.current || Date.now() - lastEdit.current < 5000) return;
+      etags.current.set(id, r.etag);
+      lastSaved.current = JSON.stringify(r.project);
+      setProject(r.project);
+      if (r.project.updatedBy && r.project.updatedBy !== getUserName()) flash(`Updated with ${r.project.updatedBy}’s changes`);
+    }, 8000);
+    return () => clearInterval(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloud, view, project?.id]);
 
   const openProject = (p: Project, etag?: string) => {
     if (etag) etags.current.set(p.id, etag);
@@ -249,6 +271,7 @@ export default function Studio() {
   };
 
   const update = useCallback((patch: Partial<Project>) => {
+    lastEdit.current = Date.now();
     remember(changeKey(patch));
     setProject((p) => (p ? { ...p, ...patch, updatedAt: Date.now() } : p));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -396,7 +419,6 @@ export default function Studio() {
             {saveState === "saved" ? <><Check size={13} /> Saved to team library</> : null}
             {saveState === "idle" ? <><Users size={13} /> Team library</> : null}
             {saveState === "error" ? <><CloudOff size={13} /> Not saved, retrying</> : null}
-            {saveState === "conflict" ? <><CloudOff size={13} /> Needs your choice</> : null}
           </span>
         ) : cloud === false ? (
           <span className="save-state local" title="Ask your admin to connect Vercel Blob storage to share flyers">Saved on this computer only</span>
@@ -465,28 +487,6 @@ export default function Studio() {
                 <button type="button" className="icon-btn" onClick={() => setError("")} aria-label="Dismiss"><X size={14} /></button>
               </div>
             ) : null}
-            {conflict !== undefined && saveState === "conflict" ? (
-              <div className="note warn conflict">
-                <b>{conflict ? `${conflict.project.updatedBy || "A teammate"} changed this flyer` : "This flyer was deleted"} while you were editing.</b>
-                <span>Choose what to keep:</span>
-                <div className="conflict-actions">
-                  {conflict ? (
-                    <button type="button" className="btn small" onClick={() => openProject(conflict.project, conflict.etag)}>Load their version</button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="btn small"
-                    onClick={() => {
-                      const etag = conflict ? conflict.etag : null;
-                      setConflict(null);
-                      saveNow(project, { etag, force: true });
-                    }}
-                  >
-                    Keep mine (replace theirs)
-                  </button>
-                </div>
-              </div>
-            ) : null}
             {saveState === "error" && saveError ? <div className="note warn">{saveError}</div> : null}
             {missing.length ? (
               <div className="note warn">
@@ -499,7 +499,6 @@ export default function Studio() {
                 <div className="card open">
                   <div className="card-body">
                     <h3 className="h3">Paste the course information</h3>
-                    <p className="note">Paste anything: a brochure, a website page, an email or notes. AI fills in the flyer using only those facts. You can edit everything afterwards.</p>
                     <textarea className="input paste" rows={14} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder={"Program: Personal Support Worker\nDuration: 6 months, 700 hours including 300 hours clinical placement\nFee: $5,500\nWhat you will learn: ...\nCareers: ...\nAdmission: ..."} />
                     <Toggle label="Also generate a photo" checked={alsoPhoto} onChange={setAlsoPhoto} />
                     <button type="button" className="btn primary wide" disabled={parsing || pasted.trim().length < 20} onClick={runParse}>
@@ -581,7 +580,6 @@ export default function Studio() {
             </div>
           </div>
           {fe.overlays}
-          <p className="stage-foot">Point at any text and click the pencil to edit it on the flyer. US Letter with 0.125 in bleed (8.75 x 11.25 in). Keep important text away from the edges.</p>
         </section>
       </div>
 
@@ -595,7 +593,6 @@ export default function Studio() {
 
             {cloud ? (
               <>
-                <p className="note">Everyone on the team sees these flyers. Changes save automatically.</p>
                 <div className="search-row">
                   <Search size={15} />
                   <input className="input" placeholder="Search flyers" value={teamQuery} onChange={(e) => setTeamQuery(e.target.value)} />

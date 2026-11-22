@@ -6,29 +6,24 @@ const TILES = [
   {
     href: "/news",
     title: "Department news",
-    text: "Today's verified news for each department, ready to turn into informative posts and carousels.",
     tag: "News",
     icon: Newspaper,
-    dark: true,
   },
   {
     href: "/social",
     title: "Social media posts",
-    text: "Type an idea, pick a catchy hook, and get finished posts in English or Tamil.",
     tag: "Posts",
     icon: Megaphone,
   },
   {
     href: "/flyers",
     title: "Flyers",
-    text: "Paste course information and get a print-ready program flyer in the BOSS design.",
     tag: "Print",
     icon: FileText,
   },
   {
     href: "/booklet",
     title: "Company profile booklet",
-    text: "The 40 page company profile in Tamil and English. Edit any text or photo and download it.",
     tag: "Print",
     icon: BookOpen,
   },
@@ -48,20 +43,21 @@ export default function Home() {
       </section>
       <nav className="tiles" aria-label="BOSS tools">
         {TILES.map((t) => (
-          <a key={t.href} href={t.href} className={`tile${t.dark ? " dark" : ""}`}>
-            <span className="tile-tag">{t.tag}</span>
+          <a key={t.href} href={t.href} className="tile">
             <span className="tile-icon">
-              <t.icon size={26} strokeWidth={1.9} />
+              <t.icon size={44} strokeWidth={1.7} />
             </span>
             <h2>{t.title}</h2>
-            <p>{t.text}</p>
             <span className="tile-go">
               Open <ArrowRight size={16} />
             </span>
           </a>
         ))}
       </nav>
-      <footer className="home-foot">BOSS Consultancy Services · 416 605 0101 · BOSSCS.COM</footer>
+      <footer className="home-foot">
+        <a href="tel:+14166050101">416 605 0101</a>
+        <a href="https://bosscs.com" target="_blank" rel="noreferrer">bosscs.com</a>
+      </footer>
     </div>
   );
 }

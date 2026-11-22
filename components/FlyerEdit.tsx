@@ -1,42 +1,49 @@
 "use client";
 
 /**
- * Edit the flyer right on the page, the same way as the booklet:
- * point at any text to see the pencil, click to select it, double-click (or the pencil) to type.
- * The change is written back into the flyer's text fields, so the layout stays tidy.
+ * Canva-style control on the flyer, on top of the automatic layout.
+ * Hover: outline + pencil. Click: select. Drag: move. Handles: resize. Double-click: type.
+ * Text changes go back into the flyer's fields; moves, sizes and colours are stored as overrides.
  */
 
-import { useCallback, useEffect, useState, type ReactNode, type RefObject } from "react";
-import { Image as ImageIcon, Minus, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  AlignCenter, AlignLeft, AlignRight, ArrowUpLeft, Bold, EyeOff, Image as ImageIcon, Italic, Minus, Pencil, Plus, RotateCcw, X,
+} from "lucide-react";
 import { cleanText } from "@/lib/text";
-import type { FontKey, Project } from "@/lib/types";
+import { elKey, selectorOf } from "@/lib/flyerEls";
+import type { ElOverride, Project } from "@/lib/types";
 
-type Pick = { field: string; i?: number; part?: string; group?: FontKey };
+type Pick = { field: string; i?: number; part?: string };
 
 const NAMES: Record<string, string> = {
-  eyebrow: "Small line above the title", titleLine: "Title", bigCode: "Big code", pill: "Badge", tagline: "Tagline", intro: "Intro",
-  financialNote: "Financial note", learn: "What you will learn", careers: "Career", admission: "Admission item", highlights: "Highlight",
-  facts: "Key fact", salary: "Salary", photo: "Photo", "brand.phone": "Phone", "brand.address": "Address", "brand.website": "Website",
+  eyebrow: "Small title", titleLine: "Title", bigCode: "Big code", pill: "Badge", tagline: "Tagline", intro: "Intro",
+  financialNote: "Financial note", learn: "List item", careers: "Career", admission: "Admission item", highlights: "Highlight",
+  facts: "Key fact", salary: "Salary", "brand.phone": "Phone", "brand.address": "Address", "brand.website": "Website",
   "brand.companyTagline": "Logo tagline",
+  "el:band": "Header", "el:logo": "Logo", "el:title": "Title block", "el:photo": "Photo", "el:facts": "Key facts bar",
+  "el:sec-learn": "What you will learn", "el:sec-careers": "Careers", "el:sec-admission": "Admission", "el:sec-highlights": "Highlights",
+  "el:sec-salary": "Salary box", "el:callout": "Financial note box", "el:footer": "Footer",
 };
-const nameOf = (p: Pick) => (p.field.startsWith("titles.") ? "Section title" : NAMES[p.field] || "Text");
 const LISTS = ["learn", "careers", "admission", "highlights"] as const;
+const SEL = "[data-el], [data-field]";
 
-/** index in the stored list of the i-th item that is actually shown */
 function realIndex<T>(arr: T[], shown: (x: T) => boolean, i: number) {
   let n = -1;
   for (let k = 0; k < arr.length; k++) if (shown(arr[k]) && ++n === i) return k;
   return -1;
 }
-
-function readPick(el: HTMLElement): Pick {
-  return {
-    field: el.dataset.field || "",
-    i: el.dataset.i != null ? Number(el.dataset.i) : undefined,
-    part: el.dataset.part,
-    group: el.dataset.group as FontKey | undefined,
-  };
-}
+const isText = (el: HTMLElement | null) => !!el && !!el.dataset.field && el.dataset.field !== "photo" && !el.dataset.el;
+const readPick = (el: HTMLElement): Pick => ({
+  field: el.dataset.field || "",
+  i: el.dataset.i != null ? Number(el.dataset.i) : undefined,
+  part: el.dataset.part,
+});
+const rgbToHex = (c: string) => {
+  const m = c.match(/\d+(\.\d+)?/g);
+  if (!m || (m.length === 4 && Number(m[3]) === 0)) return "#ffffff";
+  return "#" + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+};
 
 export function useFlyerEdit({
   box,
@@ -53,12 +60,30 @@ export function useFlyerEdit({
 }) {
   const [hover, setHover] = useState<HTMLElement | null>(null);
   const [selEl, setSelEl] = useState<HTMLElement | null>(null);
-  const [pick, setPick] = useState<Pick | null>(null);
+  const [key, setKey] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [, tick] = useState(0);
+  const drag = useRef<{ el: HTMLElement; key: string; x: number; y: number; o: ElOverride; moved: boolean } | null>(null);
 
-  /** current stored text for a picked item */
+  const ovs = project?.design.overrides || {};
+  const ov: ElOverride = (key && ovs[key]) || {};
+
+  /* ---------- overrides ---------- */
+  const setOv = useCallback((k: string, patch: Partial<ElOverride> | null) => {
+    if (!project) return;
+    const all = { ...(project.design.overrides || {}) };
+    if (patch === null) delete all[k];
+    else {
+      const next: ElOverride = { ...(all[k] || {}), ...patch };
+      for (const f of Object.keys(next) as (keyof ElOverride)[]) if (next[f] === undefined) delete next[f];
+      if (Object.keys(next).length) all[k] = next;
+      else delete all[k];
+    }
+    update({ design: { ...project.design, overrides: all } });
+  }, [project, update]);
+
+  /* ---------- text fields ---------- */
   const valueOf = useCallback((p: Pick): string => {
     if (!project) return "";
     const c = project.content;
@@ -69,42 +94,34 @@ export function useFlyerEdit({
       const k = realIndex(arr, (x) => !!cleanText(x), p.i || 0);
       return k >= 0 ? arr[k] : "";
     }
-    if (p.field === "facts") {
-      const k = realIndex(c.facts || [], (f) => !!f.value.trim(), p.i || 0);
-      return k >= 0 ? String((c.facts[k] as unknown as Record<string, string>)[p.part || "value"] || "") : "";
-    }
-    if (p.field === "salary") {
-      const k = realIndex(c.salary || [], (r) => !!r.value.trim(), p.i || 0);
-      return k >= 0 ? String((c.salary[k] as unknown as Record<string, string>)[p.part || "value"] || "") : "";
+    if (p.field === "facts" || p.field === "salary") {
+      const arr = (p.field === "facts" ? c.facts : c.salary) as unknown as Record<string, string>[];
+      const k = realIndex(arr || [], (r) => !!String(r.value || "").trim(), p.i || 0);
+      return k >= 0 ? String(arr[k][p.part || "value"] || "") : "";
     }
     if (p.field === "titleLine") return (c.titleLine || "").split("\n").map((s) => cleanText(s)).filter(Boolean)[p.i || 0] || "";
     return String((c as unknown as Record<string, string>)[p.field] || "");
   }, [project]);
 
-  /** writes text back into the flyer (empty text removes a list item) */
   const write = useCallback((p: Pick, text: string) => {
     if (!project) return;
     const c = { ...project.content };
     const v = text.replace(/ /g, " ").replace(/\s+\n/g, "\n").trim();
-    if (p.field.startsWith("brand.")) {
-      update({ brand: { ...project.brand, [p.field.slice(6)]: v } });
-      return;
-    }
+    if (p.field.startsWith("brand.")) return update({ brand: { ...project.brand, [p.field.slice(6)]: v } });
     if (p.field.startsWith("titles.")) c.titles = { ...c.titles, [p.field.slice(7)]: v };
     else if ((LISTS as readonly string[]).includes(p.field)) {
-      const key = p.field as (typeof LISTS)[number];
-      const arr = [...(c[key] || [])];
+      const k2 = p.field as (typeof LISTS)[number];
+      const arr = [...(c[k2] || [])];
       const k = realIndex(arr, (x) => !!cleanText(x), p.i || 0);
       if (k < 0) return;
       if (v) arr[k] = v;
       else arr.splice(k, 1);
-      c[key] = arr;
+      c[k2] = arr;
     } else if (p.field === "facts" || p.field === "salary") {
       const arr = [...(p.field === "facts" ? c.facts : c.salary)] as unknown as Record<string, string>[];
       const k = realIndex(arr, (r) => !!String(r.value || "").trim(), p.i || 0);
       if (k < 0) return;
-      if (!v && (p.part || "value") === "value") arr.splice(k, 1);
-      else arr[k] = { ...arr[k], [p.part || "value"]: v };
+      arr[k] = { ...arr[k], [p.part || "value"]: v };
       if (p.field === "facts") c.facts = arr as unknown as typeof c.facts;
       else c.salary = arr as unknown as typeof c.salary;
     } else if (p.field === "titleLine") {
@@ -115,11 +132,11 @@ export function useFlyerEdit({
     update({ content: c });
   }, [project, update]);
 
+  /* ---------- selection ---------- */
   const select = (el: HTMLElement | null) => {
     setSelEl(el);
-    const p = el ? readPick(el) : null;
-    setPick(p);
-    setDraft(p ? valueOf(p) : "");
+    setKey(el ? elKey(el) : null);
+    setDraft(el && isText(el) ? valueOf(readPick(el)) : "");
   };
   const finishTyping = useCallback((el: HTMLElement) => {
     el.contentEditable = "false";
@@ -130,7 +147,7 @@ export function useFlyerEdit({
     setDraft(text.trim());
   }, [valueOf, write]);
   const startTyping = (el: HTMLElement) => {
-    if (el.dataset.field === "photo") { onPhoto(); return; }
+    if (!isText(el)) { if (el.dataset.el === "photo") onPhoto(); return; }
     select(el);
     el.contentEditable = "true";
     setEditing(true);
@@ -142,27 +159,55 @@ export function useFlyerEdit({
     s?.removeAllRanges();
     s?.addRange(r);
   };
+  const parentOf = (el: HTMLElement | null) => (el?.parentElement?.closest(SEL) as HTMLElement | null) || null;
 
   useEffect(() => {
     const host = box.current;
     if (!host) return;
-    const fieldOf = (t: EventTarget | null) => ((t as HTMLElement)?.closest?.("[data-field]") as HTMLElement | null) || null;
+    const pickAt = (t: EventTarget | null) => ((t as HTMLElement)?.closest?.(SEL) as HTMLElement | null) || null;
     const move = (e: MouseEvent) => {
-      const f = fieldOf(e.target);
-      setHover((h) => (h === f ? h : f));
+      const d = drag.current;
+      if (d) {
+        const dx = (e.clientX - d.x) / scale;
+        const dy = (e.clientY - d.y) / scale;
+        if (!d.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+        d.moved = true;
+        d.el.style.setProperty("transform", `translate(${(d.o.x || 0) + dx}px,${(d.o.y || 0) + dy}px) scale(${d.o.s || 1})`, "important");
+        d.el.style.setProperty("position", "relative", "important");
+        d.el.style.setProperty("z-index", "3", "important");
+        tick((n) => n + 1);
+        return;
+      }
+      if (host.contains(e.target as Node)) {
+        const f = pickAt(e.target);
+        setHover((h) => (h === f ? h : f));
+      }
     };
     const leave = () => setHover(null);
     const down = (e: MouseEvent) => {
-      const f = fieldOf(e.target);
+      const f = pickAt(e.target);
       if (f && f.isContentEditable) return;
       if (editing && selEl) finishTyping(selEl);
       if (!f) { select(null); return; }
       e.preventDefault();
-      select(f);
+      // clicking inside the selected block keeps the block, so it can be dragged as a whole
+      const target = selEl && selEl !== f && selEl.contains(f) && !isText(selEl) ? selEl : f;
+      if (target !== selEl) select(target);
+      const k = elKey(target);
+      drag.current = { el: target, key: k, x: e.clientX, y: e.clientY, o: { ...((project?.design.overrides || {})[k] || {}) }, moved: false };
+    };
+    const up = (e: MouseEvent) => {
+      const d = drag.current;
+      drag.current = null;
+      if (!d || !d.moved) return;
+      const dx = (e.clientX - d.x) / scale;
+      const dy = (e.clientY - d.y) / scale;
+      ["transform", "position", "z-index"].forEach((p) => d.el.style.removeProperty(p));
+      setOv(d.key, { x: Math.round((d.o.x || 0) + dx), y: Math.round((d.o.y || 0) + dy) });
     };
     const dbl = (e: MouseEvent) => {
-      const f = fieldOf(e.target);
-      if (f) startTyping(f);
+      const f = pickAt(e.target);
+      if (f) startTyping(isText(f) ? f : ((f.querySelector("[data-field]:not([data-el])") as HTMLElement) || f));
     };
     const out = (e: FocusEvent) => {
       const el = e.target as HTMLElement;
@@ -178,79 +223,120 @@ export function useFlyerEdit({
         return;
       }
       const tag = el?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (!selEl) return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || !selEl || !key) return;
       if (e.key === "Escape") select(null);
-      if (e.key === "Enter") { e.preventDefault(); startTyping(selEl); }
+      else if (e.key === "Enter" && isText(selEl)) { e.preventDefault(); startTyping(selEl); }
+      else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); setOv(key, { hide: true }); select(null); }
+      else if (e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        const d = e.shiftKey ? 10 : 1;
+        const o = (project?.design.overrides || {})[key] || {};
+        setOv(key, {
+          x: (o.x || 0) + (e.key === "ArrowLeft" ? -d : e.key === "ArrowRight" ? d : 0),
+          y: (o.y || 0) + (e.key === "ArrowUp" ? -d : e.key === "ArrowDown" ? d : 0),
+        });
+      }
     };
     const redraw = () => tick((n) => n + 1);
-    host.addEventListener("mousemove", move);
     host.addEventListener("mouseleave", leave);
     host.addEventListener("mousedown", down);
     host.addEventListener("dblclick", dbl);
     host.addEventListener("focusout", out, true);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
     window.addEventListener("keydown", keys);
     const stage = host.closest(".stage");
     stage?.addEventListener("scroll", redraw);
     window.addEventListener("resize", redraw);
     return () => {
-      host.removeEventListener("mousemove", move);
       host.removeEventListener("mouseleave", leave);
       host.removeEventListener("mousedown", down);
       host.removeEventListener("dblclick", dbl);
       host.removeEventListener("focusout", out, true);
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
       window.removeEventListener("keydown", keys);
       stage?.removeEventListener("scroll", redraw);
       window.removeEventListener("resize", redraw);
     };
   });
 
-  // after a re-render the selected element may be a new node: find it again by its field
+  // after a re-render the selected element may be a new node: find it again
   useEffect(() => {
-    if (!pick || !box.current || (selEl && selEl.isConnected)) return;
-    const q = `[data-field="${pick.field}"]${pick.i != null ? `[data-i="${pick.i}"]` : ""}${pick.part ? `[data-part="${pick.part}"]` : ""}`;
-    const el = box.current.querySelector(q) as HTMLElement | null;
+    if (!key || !box.current || (selEl && selEl.isConnected)) return;
+    const el = box.current.querySelector(selectorOf(key)) as HTMLElement | null;
     setSelEl(el);
-    if (!el) setPick(null);
+    if (!el) setKey(null);
   });
 
-  const sizeStep = (d: number) => {
-    if (!project || !pick?.group) return;
-    const cur = project.design.fontScales?.[pick.group] ?? 1;
-    const next = Math.max(0.6, Math.min(1.8, Math.round((cur + d) * 100) / 100));
-    update({ design: { ...project.design, fontScales: { ...(project.design.fontScales || {}), [pick.group]: next } } });
+  /* ---------- resize handles ---------- */
+  const startResize = (e: React.MouseEvent, dir: string) => {
+    if (!selEl || !key) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = selEl;
+    const k = key;
+    const o = { ...ov };
+    const x0 = e.clientX;
+    const w0 = el.offsetWidth;
+    const s0 = o.s || 1;
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const d0 = Math.max(10, Math.abs(x0 - cx));
+    let last: Partial<ElOverride> = {};
+    const mv = (ev: MouseEvent) => {
+      if (dir === "e" || dir === "w") {
+        const dx = (ev.clientX - x0) / scale;
+        const w = Math.max(30, Math.round(w0 + (dir === "e" ? dx : -dx)));
+        last = { w };
+        el.style.setProperty("width", `${w}px`, "important");
+        el.style.setProperty("max-width", "none", "important");
+      } else {
+        const s = Math.max(0.3, Math.min(4, Math.round((s0 * Math.abs(ev.clientX - cx)) / d0 * 100) / 100));
+        last = { s };
+        el.style.setProperty("transform", `translate(${o.x || 0}px,${o.y || 0}px) scale(${s})`, "important");
+      }
+      tick((n) => n + 1);
+    };
+    const upR = () => {
+      window.removeEventListener("mousemove", mv);
+      window.removeEventListener("mouseup", upR);
+      ["width", "max-width", "transform"].forEach((p) => el.style.removeProperty(p));
+      if (Object.keys(last).length) setOv(k, last);
+    };
+    window.addEventListener("mousemove", mv);
+    window.addEventListener("mouseup", upR);
   };
-  const resetSize = () => {
-    if (!project || !pick?.group) return;
-    const fs = { ...(project.design.fontScales || {}) };
-    delete fs[pick.group];
-    update({ design: { ...project.design, fontScales: fs } });
-  };
-  const canRemove = pick && ((LISTS as readonly string[]).includes(pick.field) || pick.field === "facts" || pick.field === "salary" || ["eyebrow", "pill", "tagline", "intro", "financialNote", "bigCode"].includes(pick.field));
 
+  /* ---------- overlays ---------- */
   const rect = (el: HTMLElement | null) => {
     if (!el || !el.isConnected) return null;
     const r = el.getBoundingClientRect();
     return r.width || r.height ? r : null;
   };
-  const hr = hover && hover !== selEl && !editing ? rect(hover) : null;
+  const hr = hover && hover !== selEl && !editing && !drag.current ? rect(hover) : null;
   const sr = rect(selEl);
-  void scale;
 
   const overlays: ReactNode = (
     <>
       {hr && (
         <div className="bk-hover" style={{ left: hr.left - 2, top: hr.top - 2, width: hr.width + 4, height: hr.height + 4 }}>
-          <button type="button" className="bk-pencil" title={hover?.dataset.field === "photo" ? "Change the photo" : "Edit this text"}
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); if (hover) startTyping(hover); }}>
-            <Pencil size={12} />
-          </button>
+          {(isText(hover) || hover?.dataset.el === "photo") && (
+            <button type="button" className="bk-pencil" title="Edit"
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); if (hover) startTyping(hover); }}>
+              <Pencil size={12} />
+            </button>
+          )}
         </div>
       )}
       {sr && (
         <div className={`bk-selbox${editing ? " typing" : ""}`} style={{ left: sr.left - 2, top: sr.top - 2, width: sr.width + 4, height: sr.height + 4 }}>
-          {!editing && (
-            <button type="button" className="bk-pencil" title="Edit (double-click or Enter)"
+          {!editing && ["nw", "ne", "se", "sw"].map((d) => <span key={d} className={`bk-handle h-${d}`} onMouseDown={(e) => startResize(e, d)} />)}
+          {!editing && selEl?.dataset.el !== "photo" && selEl?.dataset.el !== "logo" && ["e", "w"].map((d) => (
+            <span key={d} className={`bk-handle h-${d}`} onMouseDown={(e) => startResize(e, d)} />
+          ))}
+          {!editing && isText(selEl) && (
+            <button type="button" className="bk-pencil" title="Type"
               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); if (selEl) startTyping(selEl); }}>
               <Pencil size={12} />
             </button>
@@ -260,36 +346,68 @@ export function useFlyerEdit({
     </>
   );
 
-  const card: ReactNode = pick ? (
+  /* ---------- side panel ---------- */
+  const cs = selEl ? getComputedStyle(selEl) : null;
+  const curPx = ov.fpx || (cs ? Math.round(parseFloat(cs.fontSize)) : 14);
+  const parent = parentOf(selEl);
+  const text = isText(selEl);
+  const anyOv = Object.keys(ovs).length > 0;
+
+  const card: ReactNode = key ? (
     <div className="card open fe-card">
       <div className="card-head">
-        <div className="card-toggle">Selected: {nameOf(pick)}</div>
+        <div className="card-toggle">{NAMES[key] || NAMES[key.slice(2).split("|")[0]] || (key.includes("titles.") ? "Section title" : "Text")}</div>
         <button type="button" className="icon-btn" onClick={() => select(null)} aria-label="Close"><X size={14} /></button>
       </div>
-      <div className="card-body">
-        {pick.field === "photo" ? (
-          <button type="button" className="btn" onClick={onPhoto}><ImageIcon size={14} /> Change or move the photo</button>
-        ) : (
-          <>
-            <p className="bk-hint">Double-click text on the flyer to type in it, or edit it here.</p>
-            <textarea className="input" rows={pick.field === "intro" || pick.field === "financialNote" ? 4 : 2} value={draft}
-              onChange={(e) => setDraft(e.target.value)} onBlur={() => { if (draft.trim() !== valueOf(pick).trim()) write(pick, draft); }} />
-            {pick.group && (
-              <div className="bk-row" style={{ alignItems: "center" }}>
-                <span className="bk-label">Text size</span>
-                <button type="button" className="btn icon-only" title="Smaller" onClick={() => sizeStep(-0.05)}><Minus size={14} /></button>
-                <span className="bk-zoom">{Math.round((project?.design.fontScales?.[pick.group] ?? 1) * 100)}%</span>
-                <button type="button" className="btn icon-only" title="Bigger" onClick={() => sizeStep(0.05)}><Plus size={14} /></button>
-                <button type="button" className="btn icon-only" title="Reset size" onClick={resetSize}><RotateCcw size={14} /></button>
-              </div>
-            )}
-            {pick.group && <p className="bk-hint">Size changes apply to all text of this kind, so the flyer stays consistent.</p>}
-            {canRemove && (
-              <button type="button" className="btn" onClick={() => { write(pick, ""); select(null); }}><Trash2 size={14} /> Remove</button>
-            )}
-          </>
+      <div className="card-body fe-tools">
+        {text && (
+          <textarea className="input" rows={2} value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => { const p = selEl ? readPick(selEl) : null; if (p && draft.trim() !== valueOf(p).trim()) write(p, draft); }} />
+        )}
+        {selEl?.dataset.el === "photo" && <button type="button" className="btn" onClick={onPhoto}><ImageIcon size={14} /> Photo</button>}
+        <div className="fe-row">
+          {text && (
+            <>
+              <button type="button" className="btn icon-only" title="Smaller" onClick={() => setOv(key, { fpx: Math.max(6, curPx - 1) })}><Minus size={14} /></button>
+              <span className="fe-num">{curPx}</span>
+              <button type="button" className="btn icon-only" title="Bigger" onClick={() => setOv(key, { fpx: curPx + 1 })}><Plus size={14} /></button>
+              <span className="fe-sep" />
+              <button type="button" className={`btn icon-only ${ov.b ? "on" : ""}`} title="Bold" onClick={() => setOv(key, { b: !(ov.b ?? (cs ? Number(cs.fontWeight) >= 600 : false)) })}><Bold size={14} /></button>
+              <button type="button" className={`btn icon-only ${ov.it ? "on" : ""}`} title="Italic" onClick={() => setOv(key, { it: !(ov.it ?? cs?.fontStyle === "italic") })}><Italic size={14} /></button>
+              <span className="fe-sep" />
+              <button type="button" className={`btn icon-only ${ov.al === "left" ? "on" : ""}`} title="Left" onClick={() => setOv(key, { al: "left" })}><AlignLeft size={14} /></button>
+              <button type="button" className={`btn icon-only ${ov.al === "center" ? "on" : ""}`} title="Centre" onClick={() => setOv(key, { al: "center" })}><AlignCenter size={14} /></button>
+              <button type="button" className={`btn icon-only ${ov.al === "right" ? "on" : ""}`} title="Right" onClick={() => setOv(key, { al: "right" })}><AlignRight size={14} /></button>
+            </>
+          )}
+        </div>
+        <div className="fe-row">
+          {selEl?.dataset.el !== "logo" && selEl?.dataset.el !== "photo" && (
+            <>
+              <label className="fe-color" title="Text colour">
+                <span>A</span>
+                <input type="color" value={ov.color || rgbToHex(cs?.color || "#000")} onChange={(e) => setOv(key, { color: e.target.value })} />
+              </label>
+              <label className="fe-color" title="Fill colour">
+                <span className="fe-fill" style={{ background: ov.bg || rgbToHex(cs?.backgroundColor || "#fff") }} />
+                <input type="color" value={ov.bg || rgbToHex(cs?.backgroundColor || "#fff")} onChange={(e) => setOv(key, { bg: e.target.value })} />
+              </label>
+              <span className="fe-sep" />
+            </>
+          )}
+          {parent && <button type="button" className="btn icon-only" title="Select the whole block" onClick={() => select(parent)}><ArrowUpLeft size={14} /></button>}
+          <button type="button" className="btn icon-only" title="Hide" onClick={() => { setOv(key, { hide: true }); select(null); }}><EyeOff size={14} /></button>
+          <button type="button" className="btn icon-only" title="Undo my changes to this" disabled={!ovs[key]} onClick={() => setOv(key, null)}><RotateCcw size={14} /></button>
+        </div>
+        {anyOv && (
+          <button type="button" className="fe-link" onClick={() => project && update({ design: { ...project.design, overrides: {} } })}>Reset all manual changes</button>
         )}
       </div>
+    </div>
+  ) : anyOv ? (
+    <div className="fe-resetall">
+      <button type="button" className="fe-link" onClick={() => project && update({ design: { ...project.design, overrides: {} } })}>Reset all manual changes</button>
     </div>
   ) : null;
 
