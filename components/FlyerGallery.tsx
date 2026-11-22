@@ -5,13 +5,13 @@
  * Hover a flyer to see the pencil, click to open it in the editor.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Home, Pencil, Plus, Search } from "lucide-react";
+import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
+import { BookOpen, Home, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import Flyer, { FLYER_H, FLYER_W } from "./Flyer";
 import { TEMPLATES, isMasterId, masterId, templateByName, type Template } from "@/lib/samples";
 import { loadMaster } from "@/lib/masters";
-import { listProjects } from "@/lib/storage";
-import { teamList, teamLoad } from "@/lib/teamApi";
+import { deleteProject, listProjects } from "@/lib/storage";
+import { teamDelete, teamList, teamLoad } from "@/lib/teamApi";
 import type { Project } from "@/lib/types";
 
 const THUMB_W = 250;
@@ -33,6 +33,26 @@ export default function FlyerGallery({
   const [saved, setSaved] = useState<Item[] | null>(null);
   const [q, setQ] = useState("");
   const [error, setError] = useState("");
+  const [confirm, setConfirm] = useState<string>(""); // id (or "all") waiting for a second click
+  const [busy, setBusy] = useState(false);
+
+  /** Deleted flyers move to the trash folder in storage (an admin can recover them). */
+  const remove = async (ids: string[]) => {
+    setBusy(true);
+    setError("");
+    try {
+      for (const id of ids) {
+        if (cloud) await teamDelete(id);
+        await deleteProject(id).catch(() => undefined);
+      }
+      setSaved((list) => (list || []).filter((i) => !ids.includes(i.project.id)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete.");
+    } finally {
+      setBusy(false);
+      setConfirm("");
+    }
+  };
 
   useEffect(() => {
     if (cloud === null) return;
@@ -85,8 +105,16 @@ export default function FlyerGallery({
 
   const match = (name: string) => !q.trim() || name.toLowerCase().includes(q.trim().toLowerCase());
   // other programs (made with New flyer) are their own single master; old duplicates of a program are tucked away
-  const others = (saved || []).filter((i) => !isMasterId(i.project.id) && !templateByName(i.project.name));
-  const olderCopies = (saved || []).filter((i) => !isMasterId(i.project.id) && templateByName(i.project.name));
+  // newest flyer per name is that program's flyer; any other flyer with the same name is a duplicate
+  const seen = new Set<string>();
+  const others: Item[] = [];
+  const olderCopies: Item[] = [];
+  for (const i of saved || []) {
+    if (isMasterId(i.project.id)) continue;
+    const key = (i.project.name || "").trim().toLowerCase();
+    if (templateByName(i.project.name) || seen.has(key)) olderCopies.push(i);
+    else { seen.add(key); others.push(i); }
+  }
   const shown = others.filter((i) => match(i.project.name));
   void masterId;
   void useMemo;
@@ -142,12 +170,22 @@ export default function FlyerGallery({
         </section>
 
         {olderCopies.length > 0 && (
-          <details className="fg-older">
-            <summary>Older copies from before ({olderCopies.length})</summary>
-            <p className="fg-note">These were made before each program had one master flyer. The newest one was used to start the master. You can open them to compare, or delete them from Team flyers.</p>
+          <details className="fg-older" open>
+            <summary>Duplicate copies ({olderCopies.length})</summary>
+            <p className="fg-note">Extra copies of a program flyer. The program flyer above is the newest one, so these older copies can be deleted once it looks right.</p>
+            <button type="button" className={`btn ${confirm === "all" ? "danger" : ""}`} disabled={busy}
+              onClick={() => (confirm === "all" ? remove(olderCopies.map((i) => i.project.id)) : setConfirm("all"))}>
+              <Trash2 size={15} /> {confirm === "all" ? `Click again to delete all ${olderCopies.length} duplicates` : "Delete all duplicates"}
+            </button>
             <div className="fg-grid">
               {olderCopies.filter((i) => match(i.project.name)).map((i) => (
-                <Card key={i.key} project={i.project} sub={i.sub} onOpen={() => onOpen(i.project, i.etag)} />
+                <div key={i.key} className="fg-dup">
+                  <Card project={i.project} sub={i.sub} onOpen={() => onOpen(i.project, i.etag)} />
+                  <button type="button" className={`btn small ${confirm === i.project.id ? "danger" : ""}`} disabled={busy}
+                    onClick={() => (confirm === i.project.id ? remove([i.project.id]) : setConfirm(i.project.id))}>
+                    <Trash2 size={14} /> {confirm === i.project.id ? "Click again to delete" : "Delete"}
+                  </button>
+                </div>
               ))}
             </div>
           </details>
@@ -162,7 +200,7 @@ function Card({ project, sub, onOpen }: { project: Project; sub: string; onOpen:
     <div className="fg-card">
       <button type="button" className="fg-thumb" style={{ width: THUMB_W, height: FLYER_H * S }} onClick={onOpen} title={`Edit ${project.name}`}>
         <span className="fg-scale" style={{ width: FLYER_W, height: FLYER_H, transform: `scale(${S})` }}>
-          <Flyer content={project.content} design={project.design} brand={project.brand} />
+          <Safe><Flyer content={project.content} design={project.design} brand={project.brand} /></Safe>
         </span>
         <span className="fg-over">
           <span className="fg-pencil"><Pencil size={18} /></span>
@@ -179,4 +217,15 @@ function sub(p: Project) {
   const when = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString("en-CA", { month: "short", day: "numeric" }) : "";
   const who = p.updatedBy ? ` by ${p.updatedBy}` : "";
   return when ? `Edited ${when}${who}` : "Saved flyer";
+}
+
+/** If one saved flyer is damaged, show a plain card instead of breaking the page. */
+class Safe extends Component<{ children: ReactNode }, { bad: boolean }> {
+  state = { bad: false };
+  static getDerivedStateFromError() {
+    return { bad: true };
+  }
+  render() {
+    return this.state.bad ? <div style={{ width: FLYER_W, height: FLYER_H, background: "#eef2f5", display: "grid", placeItems: "center", fontSize: 40, color: "#5d6b76" }}>Preview not available</div> : this.props.children;
+  }
 }

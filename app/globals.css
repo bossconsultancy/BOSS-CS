@@ -283,3 +283,7 @@ a.brand-mark { color: inherit; text-decoration: none; }
 .fg-older { border-top: 1px solid var(--line); padding-top: 18px; }
 .fg-older summary { cursor: pointer; font-weight: 600; color: var(--muted); font-size: 14px; }
 .fg-older .fg-grid { margin-top: 14px; opacity: .85; }
+
+.fg-older > .btn { margin: 4px 0 6px; }
+.fg-dup { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.btn.danger { background: #b42318 !important; border-color: #b42318 !important; color: #fff !important; }
