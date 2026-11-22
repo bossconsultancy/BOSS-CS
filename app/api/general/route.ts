@@ -13,7 +13,7 @@ export async function GET() {
   if (!cloudEnabled()) return NextResponse.json({ error: "The team library is not set up yet." }, { status: 501 });
   let docs = await listGeneral();
   // the first notice copied the sample's look; switch it to the BOSS design (wording unchanged)
-  const old = docs.filter((d) => /notice to all clients/i.test(d.name) && (d.html.includes('data-tpl="notice-v2"') || (!d.html.includes("data-tpl") && d.html.includes("rgb(215, 38, 46)"))));
+  const old = docs.filter((d) => /notice to all clients/i.test(d.name) && ((d.html.includes('data-tpl="notice-v2"') || d.html.includes('data-tpl="notice-v3"')) || (!d.html.includes("data-tpl") && d.html.includes("rgb(215, 38, 46)"))));
   if (old.length) {
     const html = await fs.readFile(path.join(/* turbopackIgnore: true */ process.cwd(), "public", "general", "notice.html"), "utf8");
     for (const d of old) {
