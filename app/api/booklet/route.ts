@@ -26,6 +26,23 @@ Answer with:
 
 The booklet's colours are navy #304656, dark navy #22343F, pale blue #C3D7DD, body text #3C4A54, muted #55646E.`;
 
+// General flyers (notices, announcements) are English, in the BOSS flyer style.
+const FLYER_SYSTEM = `You edit one element of a one-page printed flyer for BOSS Consultancy Services, a Toronto consultancy serving South Asian Canadian families.
+
+You are given the element's current text, its tag and its inline CSS. Do exactly what the person asks and nothing more.
+
+Rules:
+- Clear, friendly Canadian English. Keep "BOSS" in capitals.
+- Never use long dashes (— or –). Use a comma or the word "to".
+- Keep the length close to the current text unless asked for shorter or longer: the page is fixed.
+
+Answer with:
+- "text": the full replacement text for this element, or null when the text should stay as it is. Use a line break for a new line.
+- "style": CSS declarations to set on this element, as kebab-case property names ("font-size", "color", "background", "text-align", "font-weight", "line-height", "letter-spacing", "width", "height", "left", "top", "opacity", "border-radius"). Use px for sizes and #rrggbb for colours. Empty when nothing about the look should change.
+- "note": one short sentence about what you changed.
+
+BOSS colours: navy #1B3A5C, pale blue #DCE8F0, light #EEF4F8, body text #22343F, red for warnings #D7262E.`;
+
 const SCHEMA = {
   type: "object",
   properties: {
@@ -50,17 +67,22 @@ export async function POST(req: Request) {
   let text = "";
   let style = "";
   let tag = "";
+  let context = "booklet";
   try {
     const body = await req.json();
     instruction = String(body?.instruction || "").slice(0, 2000);
     text = String(body?.text || "").slice(0, 4000);
     style = String(body?.style || "").slice(0, 2000);
     tag = String(body?.tag || "").slice(0, 20);
+    context = body?.context === "flyer" ? "flyer" : "booklet";
   } catch {
     return NextResponse.json({ error: "Could not read the request." }, { status: 400 });
   }
   if (instruction.trim().length < 2) {
     return NextResponse.json({ error: "Say what you would like changed." }, { status: 400 });
+  }
+  if (process.env.MOCK_OPENAI === "1") {
+    return NextResponse.json({ text: `${text} (changed)`, style: [{ property: "color", value: "#D7262E" }], note: "Done (test mode)." });
   }
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
@@ -74,7 +96,7 @@ export async function POST(req: Request) {
     const completion = await client.chat.completions.create({
       model: process.env.OPENAI_TEXT_MODEL || "gpt-5.6",
       messages: [
-        { role: "system", content: SYSTEM },
+        { role: "system", content: context === "flyer" ? FLYER_SYSTEM : SYSTEM },
         {
           role: "user",
           content: `Element: <${tag || "div"}>\nInline CSS: ${style || "(none)"}\n\nCurrent text:\n${text || "(empty)"}\n\nWhat to change:\n${instruction}`,

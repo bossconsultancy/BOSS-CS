@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { get, set, del } from "idb-keyval";
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Copy, FileDown, Image as ImageIcon, ImageDown,
-  ArrowLeft, Home, Italic, LayoutGrid, Minus, Pencil, Plus, Printer, Redo2, RefreshCw, RotateCcw, Save, Sparkles, Trash2, Type, Undo2, ZoomIn, ZoomOut,
+  ArrowLeft, Home, Italic, LayoutGrid, Minus, Pencil, Plus, Printer, Redo2, RefreshCw, RotateCcw, Save, Sparkles, Trash2, Type, Undo2, ZoomIn, ZoomOut, MessageSquarePlus, X,
 } from "lucide-react";
 import { elementToTyped, isBamini, typedToBookletHtml } from "@/lib/bamini";
 
@@ -42,6 +42,12 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [busy, setBusy] = useState("");
   const [ask, setAsk] = useState("");
+  // notes pinned to a spot or a piece of the page; saved inside the page so the whole team sees them
+  const [noteMode, setNoteMode] = useState(false);
+  const [noteOpen, setNoteOpen] = useState<{ page: number; id: string | null; x: number; y: number; nid?: string } | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [noteMsg, setNoteMsg] = useState("");
   const [aiNote, setAiNote] = useState("");
   const [, force] = useState(0);
   const cloud = useRef(false);
@@ -161,6 +167,101 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
     fn();
     commit();
   };
+  /* ---------- notes ---------- */
+  type Note = { id: string; x: number; y: number; nid?: string; text: string; by?: string; at: number };
+  const boardOf = (sheet: Element | undefined) => sheet?.firstElementChild as HTMLElement | null;
+  const notesOf = (sheet: Element | undefined): Note[] => {
+    const tag = boardOf(sheet)?.querySelector(":scope > script.bk-notes");
+    try { return tag ? (JSON.parse(tag.textContent || "[]") as Note[]) : []; } catch { return []; }
+  };
+  const writeNotes = (sheet: Element, list: Note[]) => {
+    const board = boardOf(sheet);
+    if (!board) return;
+    let tag = board.querySelector(":scope > script.bk-notes") as HTMLScriptElement | null;
+    if (!list.length) { tag?.remove(); return; }
+    if (!tag) {
+      tag = document.createElement("script");
+      tag.type = "application/json";
+      tag.className = "bk-notes";
+      board.appendChild(tag);
+    }
+    tag.textContent = JSON.stringify(list).replace(/</g, "\\u003c");
+  };
+  const noteTarget = (sheet: Element | undefined, n: { x: number; y: number; nid?: string }) => {
+    if (!sheet) return null;
+    if (n.nid) {
+      const el = sheet.querySelector(`[data-nid="${n.nid}"]`) as HTMLElement | null;
+      if (el) return el;
+    }
+    // a note on a spot: the piece of the page under it
+    const r = sheet.getBoundingClientRect();
+    const k = r.width / PAGE_W;
+    const hit = document.elementsFromPoint(r.left + n.x * k, r.top + n.y * k).find((e) => sheet.contains(e) && e !== sheet && e !== boardOf(sheet)) as HTMLElement | undefined;
+    return hit ? itemOf(hit) : null;
+  };
+  const userName = () => { try { return localStorage.getItem("boss-flyer-user") || ""; } catch { return ""; } };
+  const openNoteFor = (page: number, n: Note) => { setNoteOpen({ page, id: n.id, x: n.x, y: n.y, nid: n.nid }); setNoteDraft(n.text); setNoteMsg(""); };
+  const startNoteOn = (item: HTMLElement) => {
+    const sheet = item.closest("section.sheet");
+    if (!sheet) return;
+    const r = sheet.getBoundingClientRect();
+    const ir = item.getBoundingClientRect();
+    const k = r.width / PAGE_W;
+    setNoteOpen({ page: pageOf(item), id: null, x: Math.round((ir.right - r.left) / k), y: Math.round((ir.top - r.top) / k), nid: "pending" });
+    setNoteDraft("");
+    setNoteMsg("");
+    noteItem.current = item;
+  };
+  const noteItem = useRef<HTMLElement | null>(null);
+  /** Saves the open note (new or edited). Returns the saved note. */
+  const saveNote = (): Note | null => {
+    const o = noteOpen;
+    const sheet = o ? sheetAt(o.page) : undefined;
+    if (!o || !sheet || !noteDraft.trim()) return null;
+    const list = notesOf(sheet);
+    let note: Note;
+    act(() => {
+      if (o.id) {
+        note = { ...list.find((n) => n.id === o.id)!, text: noteDraft.trim() };
+        writeNotes(sheet, list.map((n) => (n.id === o.id ? note : n)));
+      } else {
+        const id = `n${Date.now().toString(36)}`;
+        let nid: string | undefined;
+        if (o.nid === "pending" && noteItem.current?.isConnected) {
+          nid = noteItem.current.dataset.nid || id;
+          noteItem.current.dataset.nid = nid;
+        }
+        note = { id, x: o.x, y: o.y, nid, text: noteDraft.trim(), by: userName(), at: Date.now() };
+        writeNotes(sheet, [...list, note]);
+      }
+    }, boardOf(sheet));
+    setNoteOpen((cur) => (cur ? { ...cur, id: note!.id } : cur));
+    return note!;
+  };
+  const deleteNote = (page: number, id: string) => {
+    const sheet = sheetAt(page);
+    if (!sheet) return;
+    act(() => writeNotes(sheet, notesOf(sheet).filter((n) => n.id !== id)), boardOf(sheet));
+    setNoteOpen(null);
+  };
+  const noteWithAi = async () => {
+    const saved = saveNote();
+    const o = noteOpen;
+    if (!saved || !o) return;
+    const sheet = sheetAt(o.page);
+    const item = noteTarget(sheet, saved);
+    const target = item ? textOf(item) || item : null;
+    if (!target) { setNoteMsg("Put the note on a piece of text or a box so AI knows what to change."); return; }
+    setNoteBusy(true);
+    setNoteMsg("");
+    const res = await runAi(target, saved.text);
+    setNoteBusy(false);
+    if (res.ok) {
+      deleteNote(o.page, saved.id);
+      setAiNote(res.note);
+    } else setNoteMsg(res.note);
+  };
+
   const step = (from: Snap[], to: Snap[]) => {
     const s = from.pop();
     if (!s) return;
@@ -243,6 +344,20 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
     };
     const down = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
+      if (noteMode) {
+        e.preventDefault();
+        setNoteMode(false);
+        const sheet = t.closest?.("section.sheet");
+        if (!sheet) return;
+        const item = itemOf(t);
+        if (item && item.offsetWidth < PAGE_W - 40) { startNoteOn(item); return; }
+        const r = sheet.getBoundingClientRect();
+        const k = r.width / PAGE_W;
+        setNoteOpen({ page: pageOf(t), id: null, x: Math.round((e.clientX - r.left) / k), y: Math.round((e.clientY - r.top) / k) });
+        setNoteDraft("");
+        setNoteMsg("");
+        return;
+      }
       if (t.closest?.('[contenteditable="true"]')) return; // typing: let the caret move
       const box = itemOf(t);
       if (!box) { if (!t.closest?.(".bk-handle")) clearSel(); return; }
@@ -333,7 +448,7 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
       wrap.removeEventListener("scroll", redraw);
       window.removeEventListener("resize", redraw);
     };
-  }, [ready, sel, editing, zoom]);           // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, sel, editing, zoom, noteMode]);           // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Resize from a corner or side handle. */
   const startResize = (e: React.MouseEvent, dir: string) => {
@@ -445,38 +560,45 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
   };
 
   // ---------- ask for a change in words (uses the OpenAI key on this site) ----------
-  const askAi = async () => {
-    const target = textOf(sel) || sel;
-    if (!target || !ask.trim()) return;
-    setBusy("ai");
-    setAiNote("");
+  /** Asks AI to change one element as described; applies the answer (undo works). */
+  const runAi = async (target: HTMLElement, instruction: string): Promise<{ ok: boolean; note: string; text?: string }> => {
     try {
       const r = await fetch("/api/booklet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          instruction: ask,
-          text: typed,
+          instruction,
+          text: isBamini(target) ? elementToTyped(target) : target.innerText,
           style: target.getAttribute("style") || "",
           tag: target.tagName.toLowerCase(),
+          context: doc ? "flyer" : "booklet",
         }),
       });
       const d = await r.json();
-      if (!r.ok || d.error) { setAiNote(d.error || "Something went wrong."); return; }
+      if (!r.ok || d.error) return { ok: false, note: d.error || "Something went wrong." };
       const fresh = typeof d.text === "string" && d.text.trim() ? (d.text as string) : "";
       act(() => {
-        if (fresh) target.innerHTML = isBamini(target) ? typedToBookletHtml(fresh) : fresh.replace(/\n/g, "<br>");
+        if (fresh) target.innerHTML = isBamini(target) ? typedToBookletHtml(fresh) : esc(fresh).replace(/\n/g, "<br>");
         (d.style || []).forEach((x: { property: string; value: string }) => {
           try { target.style.setProperty(x.property, x.value); } catch { /* ignore a property the browser does not know */ }
         });
       }, target);
-      if (fresh) setTyped(fresh);
-      setAiNote(d.note || "Done.");
-      setAsk("");
+      return { ok: true, note: d.note || "Done.", text: fresh };
     } catch {
-      setAiNote("Could not reach the server.");
-    } finally {
-      setBusy("");
+      return { ok: false, note: "Could not reach the server." };
+    }
+  };
+  const askAi = async () => {
+    const target = textOf(sel) || sel;
+    if (!target || !ask.trim()) return;
+    setBusy("ai");
+    setAiNote("");
+    const res = await runAi(target, ask);
+    setBusy("");
+    setAiNote(res.note);
+    if (res.ok) {
+      if (res.text) setTyped(res.text);
+      setAsk("");
     }
   };
 
@@ -620,6 +742,22 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
   };
 
   const isImg = !!photoOf(sel) && !textOf(sel);
+  const allNotes: { page: number; n: Note; num: number }[] = [];
+  if (ready && stage.current) {
+    let num = 0;
+    stage.current.querySelectorAll("section.sheet").forEach((sh, page) => notesOf(sh).forEach((n) => allNotes.push({ page, n, num: ++num })));
+  }
+  const pinAt = (page: number, n: { x: number; y: number; nid?: string }) => {
+    const sheet = sheetAt(page);
+    if (!sheet) return null;
+    if (n.nid && n.nid !== "pending") {
+      const el = sheet.querySelector(`[data-nid="${n.nid}"]`) as HTMLElement | null;
+      if (el) { const r = el.getBoundingClientRect(); return { x: r.right - 4, y: r.top - 10 }; }
+    }
+    const r = sheet.getBoundingClientRect();
+    const k = r.width / PAGE_W;
+    return { x: r.left + n.x * k, y: r.top + n.y * k };
+  };
   const selRect = rectOf(sel);
   const hoverRect = hover && hover !== sel ? rectOf(hover) : null;
 
@@ -689,9 +827,29 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
                   <button type="button" className="btn" onClick={addText}><Type size={14} /> Add text</button>
                   <button type="button" className="btn" onClick={duplicate} disabled={!sel}><Copy size={14} /> Copy</button>
                   <button type="button" className="btn" onClick={remove} disabled={!sel}><Trash2 size={14} /> Delete</button>
+                  <button type="button" className={`btn ${noteMode ? "on" : ""}`} title="Add a note"
+                    onClick={() => { if (sel) startNoteOn(sel); else setNoteMode((m) => !m); }}>
+                    <MessageSquarePlus size={14} /> Note
+                  </button>
                 </div>
+                {noteMode && <p className="bk-hint">Click the spot or the piece the note is about.</p>}
               </div>
             </div>
+
+            {allNotes.length > 0 && (
+              <div className="card open">
+                <div className="card-head"><div className="card-toggle">Notes · {allNotes.length}</div></div>
+                <div className="card-body bk-notes-list">
+                  {allNotes.map(({ page, n, num }) => (
+                    <button key={n.id} type="button" className="bk-note-row" onClick={() => { sheetAt(page)?.scrollIntoView({ behavior: "smooth", block: "center" }); openNoteFor(page, n); }}>
+                      <span className="bk-note-num">{num}</span>
+                      <span className="bk-note-text">{n.text}</span>
+                      {!doc && <span className="bk-note-page">p. {page + 1}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {sel && (
               <div className="card open">
@@ -775,6 +933,38 @@ export default function Booklet({ doc }: { doc?: { id: string; title: string } }
         <div className="stage bk-stage-wrap">
           {!ready && <p className="stage-foot">Opening the booklet…</p>}
           <div ref={stage} className="bk-stage" style={{ zoom }} />
+          {allNotes.map(({ page, n, num }) => {
+            const p = pinAt(page, n);
+            return p ? (
+              <button key={n.id} type="button" className={`bk-pin${noteOpen?.id === n.id ? " on" : ""}`} style={{ left: p.x, top: p.y }} title={n.text}
+                onMouseDown={(e) => e.stopPropagation()} onClick={() => openNoteFor(page, n)}>{num}</button>
+            ) : null;
+          })}
+          {noteOpen && (() => {
+            const p = pinAt(noteOpen.page, noteOpen);
+            if (!p) return null;
+            const existing = noteOpen.id ? notesOf(sheetAt(noteOpen.page)).find((n) => n.id === noteOpen.id) : null;
+            return (
+              <>
+                {!noteOpen.id && <span className="bk-pin on" style={{ left: p.x, top: p.y }}>+</span>}
+                <div className="bk-note-pop" style={{ left: Math.min(p.x + 20, window.innerWidth - 340), top: Math.min(p.y - 8, window.innerHeight - 260) }} onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="bk-note-head">
+                    <span>{existing ? `${existing.by ? existing.by + " · " : ""}${new Date(existing.at).toLocaleString("en-CA", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "New note"}</span>
+                    <button type="button" className="icon-btn" onClick={() => setNoteOpen(null)} aria-label="Close"><X size={14} /></button>
+                  </div>
+                  <textarea className="input" rows={3} autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="e.g. make this heading bigger and red" />
+                  {noteMsg && <p className="bk-note-msg">{noteMsg}</p>}
+                  <div className="bk-note-actions">
+                    <button type="button" className="btn" disabled={!noteDraft.trim() || noteBusy} onClick={() => { if (saveNote()) setNoteOpen(null); }}>Save note</button>
+                    <button type="button" className="btn primary" disabled={!noteDraft.trim() || noteBusy} onClick={noteWithAi}>
+                      <Sparkles size={14} /> {noteBusy ? "Changing…" : "Make the change with AI"}
+                    </button>
+                    {existing && <button type="button" className="btn icon-only" title="Delete note" onClick={() => deleteNote(noteOpen.page, existing.id)}><Trash2 size={14} /></button>}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
           {hoverRect && !editing && (
             <div className="bk-hover" style={{ left: hoverRect.left, top: hoverRect.top, width: hoverRect.width, height: hoverRect.height }}>
               <button type="button" className="bk-pencil" title={hover && textOf(hover) ? "Edit this text" : "Select"}

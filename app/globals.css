@@ -326,3 +326,19 @@ a.brand-mark { color: inherit; text-decoration: none; }
 .gf-start.on { border-color: #2f6df6; box-shadow: 0 0 0 2px rgba(47,109,246,.25); }
 .gf-start-thumb { display: block; aspect-ratio: 816/1056; overflow: hidden; border-radius: 6px; background: #eef2f5; }
 .gf-start-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Notes on the booklet / general flyers */
+.btn.on { background: #1B3A5C; color: #fff; border-color: #1B3A5C; }
+.bk-stage section.sheet script.bk-notes { display: none; }
+.bk-pin { position: fixed; z-index: 45; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50% 50% 50% 4px; border: 2px solid #fff; background: #F5A524; color: #1B2B38; font: 700 12px "DM Sans", sans-serif; display: grid; place-items: center; cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,.28); padding: 0; }
+.bk-pin.on { background: #2f6df6; color: #fff; }
+.bk-note-pop { position: fixed; z-index: 50; width: 320px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(27,43,56,.22); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.bk-note-head { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.bk-note-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.bk-note-msg { margin: 0; font-size: 12.5px; color: #b42318; }
+.bk-notes-list { display: flex; flex-direction: column; gap: 4px; }
+.bk-note-row { display: flex; align-items: flex-start; gap: 8px; border: 0; background: none; text-align: left; padding: 6px 4px; border-radius: 8px; cursor: pointer; font: 13px "DM Sans", sans-serif; color: var(--navy); }
+.bk-note-row:hover { background: #f1f5f8; }
+.bk-note-num { flex: none; width: 20px; height: 20px; border-radius: 50%; background: #F5A524; color: #1B2B38; font-weight: 700; font-size: 11px; display: grid; place-items: center; }
+.bk-note-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-note-page { flex: none; color: var(--muted); font-size: 12px; }
